@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "GitHalls.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "GitHalls.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

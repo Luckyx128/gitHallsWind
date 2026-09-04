@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="GitHalls.App/GitHalls.App.csproj" Id="3eea0c1e-5f2c-4166-b36a-2596d0ee027a">
+    <Platform Project="x64" />
+    <Deploy />
+  </Project>
+  <Project Path="GitHalls.Cli/GitHalls.Cli.csproj" />
+  <Project Path="GitHalls.Core.Tests/GitHalls.Core.Tests.csproj" />
+  <Project Path="GitHalls.Core/GitHalls.Core.csproj" />
+</Solution>
