@@ -23,6 +23,11 @@ public class DiffLine
         OldLineNumber = oldLineNumber;
         NewLineNumber = newLineNumber;
     }
+
+    public bool IsChangeLine => Type == DiffLineType.Addition || Type == DiffLineType.Deletion;
+    
+    // For UI selection/staging
+    public bool IsSelected { get; set; } = false;
 }
 
 public class FileDiff
@@ -37,4 +42,7 @@ public class FileDiff
         Lines = lines;
         IsBinary = isBinary;
     }
+
+    public int Additions => Lines?.Count(l => l.Type == DiffLineType.Addition) ?? 0;
+    public int Deletions => Lines?.Count(l => l.Type == DiffLineType.Deletion) ?? 0;
 }

@@ -22,14 +22,14 @@ public class DiffParser
             if (line.StartsWith("diff --git") || line.StartsWith("index ") || 
                 line.StartsWith("--- ") || line.StartsWith("+++ "))
             {
-                lines.Add(new DiffLine(line, DiffLineType.Header, null, null));
+                // Skip file headers since we display the file name in our own UI
                 continue;
             }
 
             if (line.StartsWith("@@ "))
             {
                 ParseHunkHeader(line, out oldLineNumber, out newLineNumber);
-                lines.Add(new DiffLine(line, DiffLineType.Header, null, null));
+                // We keep the line numbers updated but don't show the @@ line itself
                 continue;
             }
 

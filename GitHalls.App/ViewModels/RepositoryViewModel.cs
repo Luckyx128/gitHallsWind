@@ -273,10 +273,31 @@ public partial class RepositoryViewModel : ObservableObject
         }
     }
 
+    private System.IO.FileSystemWatcher? _gitWatcher;
+
     private void StartAutoRefresh()
     {
+        if (string.IsNullOrEmpty(RepositoryPath)) return;
+
+        var gitDir = System.IO.Path.Combine(RepositoryPath, ".git");
+        if (!System.IO.Directory.Exists(gitDir)) return;
+
+        _gitWatcher = new System.IO.FileSystemWatcher(gitDir)
+        {
+            NotifyFilter = System.IO.NotifyFilters.LastWrite | System.IO.NotifyFilters.FileName | System.IO.NotifyFilters.DirectoryName,
+            IncludeSubdirectories = true
+        };
+
+        _gitWatcher.Changed += OnGitDirectoryChanged;
+        _gitWatcher.Created += OnGitDirectoryChanged;
+        _gitWatcher.Deleted += OnGitDirectoryChanged;
+        _gitWatcher.Renamed += OnGitDirectoryChanged;
+
+        _gitWatcher.EnableRaisingEvents = true;
+
+        // Also start the polling fallback just in case
         _timerCts = new CancellationTokenSource();
-        _refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(120));
+        _refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(60));
         
         var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         if (dispatcher == null) return;
@@ -294,8 +315,37 @@ public partial class RepositoryViewModel : ObservableObject
         });
     }
 
+    private void OnGitDirectoryChanged(object sender, System.IO.FileSystemEventArgs e)
+    {
+        // Debounce or filter out lock files if needed
+        if (e.FullPath.EndsWith(".lock")) return;
+
+        var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        if (dispatcher != null)
+        {
+            _ = dispatcher.EnqueueAsync(() => RefreshAsync());
+        }
+        else
+        {
+            // If we are on a background thread from FileSystemWatcher, we must get the dispatcher from somewhere else.
+            // But we stored it in the window. 
+            // Better to dispatch to Main window's dispatcher.
+            var window = (App.Current as App)?.MainWindow;
+            if (window != null)
+            {
+                _ = window.DispatcherQueue.EnqueueAsync(() => RefreshAsync());
+            }
+        }
+    }
+
     private void StopAutoRefresh()
     {
+        if (_gitWatcher != null)
+        {
+            _gitWatcher.EnableRaisingEvents = false;
+            _gitWatcher.Dispose();
+            _gitWatcher = null;
+        }
         _timerCts?.Cancel();
         _refreshTimer?.Dispose();
     }
