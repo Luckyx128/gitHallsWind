@@ -95,7 +95,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <CommandBar Grid.Row="0" DefaultLabelPosition="Collapsed" Background="Transparent" IsOpen="False">
+                <CommandBar Grid.Row="0" DefaultLabelPosition="Right" Background="Transparent" IsOpen="False">
                     <CommandBar.Content>
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0" Height="48">
                             <Button x:Name="ToggleSidebarButton" Click="ToggleSidebar_Click"
@@ -137,16 +137,16 @@
                          repository as a whole, like the Swift toolbar SyncButton.
                          Icon-only with tooltips, except Push — its label is the one
                          that changes ("Publish Branch"), so it stays readable. -->
-                    <AppBarButton Icon="Sync" ToolTipService.ToolTip="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
-                    <AppBarButton Icon="Download" ToolTipService.ToolTip="Pull" Command="{x:Bind ViewModel.PullCommand}" />
-                    <AppBarButton Icon="Upload" LabelPosition="Right"
+                    <AppBarButton Icon="Sync" LabelPosition="Collapsed" ToolTipService.ToolTip="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
+                    <AppBarButton Icon="Download" LabelPosition="Collapsed" ToolTipService.ToolTip="Pull" Command="{x:Bind ViewModel.PullCommand}" />
+                    <AppBarButton Icon="Upload"
                                   Label="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}"
                                   ToolTipService.ToolTip="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}"
                                   Command="{x:Bind ViewModel.PushCommand}" />
                     <AppBarSeparator />
-                    <AppBarButton Icon="Refresh" ToolTipService.ToolTip="Refresh (Ctrl+R)" Command="{x:Bind ViewModel.RefreshCommand}" />
-                    <AppBarButton Icon="Shuffle" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
-                    <AppBarButton Icon="More" ToolTipService.ToolTip="Repository actions">
+                    <AppBarButton Icon="Refresh" LabelPosition="Collapsed" ToolTipService.ToolTip="Refresh (Ctrl+R)" Command="{x:Bind ViewModel.RefreshCommand}" />
+                    <AppBarButton Icon="Shuffle" LabelPosition="Collapsed" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
+                    <AppBarButton Icon="More" LabelPosition="Collapsed" ToolTipService.ToolTip="Repository actions">
                         <AppBarButton.Flyout>
                             <MenuFlyout>
                                 <MenuFlyoutItem Text="Reveal in File Explorer" Click="RevealInExplorer_Click" />
