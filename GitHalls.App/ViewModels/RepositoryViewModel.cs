@@ -57,6 +57,27 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private FileDiff? _currentDiff;
 
     [ObservableProperty]
+    private bool _isLoadingDiff;
+
+    [ObservableProperty]
+    private Commit? _selectedCommit;
+
+    [ObservableProperty]
+    private CommitDetail? _selectedCommitDetail;
+
+    [ObservableProperty]
+    private bool _isLoadingCommitDetail;
+
+    /// <summary>
+    /// Identifies the most recent async load of each kind. A slow response for
+    /// a selection the user has already moved away from must not overwrite what
+    /// is on screen, so every load checks its token is still current before
+    /// publishing anything.
+    /// </summary>
+    private Guid _diffRequestToken;
+    private Guid _commitDetailRequestToken;
+
+    [ObservableProperty]
     private Branch? _currentBranch;
 
     [ObservableProperty]
@@ -131,6 +152,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         SelectedChange = null;
         CurrentDiff = null;
+        SelectedCommit = null;
+        SelectedCommitDetail = null;
         ErrorMessage = null;
 
         if (string.IsNullOrEmpty(value)) return;
@@ -157,6 +180,52 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         else
         {
             CurrentDiff = null;
+        }
+    }
+
+    partial void OnSelectedCommitChanged(Commit? value)
+    {
+        _ = LoadCommitDetailAsync();
+    }
+
+    private async Task LoadCommitDetailAsync()
+    {
+        var repoPath = RepositoryPath;
+        var commit = SelectedCommit;
+
+        if (string.IsNullOrEmpty(repoPath) || commit == null)
+        {
+            SelectedCommitDetail = null;
+            return;
+        }
+
+        var token = Guid.NewGuid();
+        _commitDetailRequestToken = token;
+        IsLoadingCommitDetail = true;
+
+        try
+        {
+            var paths = await _gitService.GetCommitChangedPathsAsync(repoPath, commit.Hash);
+
+            var diffs = new List<FileDiff>(paths.Count);
+            foreach (var path in paths)
+            {
+                if (_commitDetailRequestToken != token) return;
+                diffs.Add(await _gitService.GetCommitFileDiffAsync(repoPath, commit.Hash, path));
+            }
+
+            if (_commitDetailRequestToken != token) return;
+            SelectedCommitDetail = new CommitDetail(commit, diffs);
+        }
+        catch (Exception ex)
+        {
+            if (_commitDetailRequestToken != token) return;
+            SelectedCommitDetail = null;
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            if (_commitDetailRequestToken == token) IsLoadingCommitDetail = false;
         }
     }
 
@@ -222,9 +291,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
             SelectedChange = Changes.FirstOrDefault(c => c.Path == SelectedChange.Path);
         }
 
-        var commits = await _gitService.GetLogAsync(repoPath);
-        Commits.Clear();
-        foreach (var c in commits) Commits.Add(c);
+        // Merged in place for the same reason as the branch list: clearing it
+        // drops the History selection, and the periodic refresh would then close
+        // the commit detail the user is reading every minute.
+        MergeCommits(await _gitService.GetLogAsync(repoPath));
 
         var branches = await _gitService.GetBranchesAsync(repoPath);
         MergeBranches(branches);
@@ -237,6 +307,26 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Replaces only what actually changed, so the list doesn't flicker.</summary>
+    private void MergeCommits(IReadOnlyList<Commit> commits)
+    {
+        for (int i = Commits.Count - 1; i >= 0; i--)
+        {
+            if (!commits.Any(c => c.Hash == Commits[i].Hash)) Commits.RemoveAt(i);
+        }
+
+        for (int i = 0; i < commits.Count; i++)
+        {
+            if (Commits.Any(c => c.Hash == commits[i].Hash)) continue;
+            Commits.Insert(Math.Min(i, Commits.Count), commits[i]);
+        }
+
+        // The selected commit was rewritten or dropped (amend, rebase, reset).
+        if (SelectedCommit != null && !Commits.Any(c => c.Hash == SelectedCommit.Hash))
+        {
+            SelectedCommit = null;
+        }
+    }
+
     private void MergeChanges(IReadOnlyList<FileChange> status)
     {
         for (int i = Changes.Count - 1; i >= 0; i--)
@@ -304,16 +394,30 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     private async Task LoadDiffAsync(FileChange change)
     {
-        if (string.IsNullOrEmpty(RepositoryPath)) return;
+        var repoPath = RepositoryPath;
+        if (string.IsNullOrEmpty(repoPath)) return;
+
+        var token = Guid.NewGuid();
+        _diffRequestToken = token;
+        IsLoadingDiff = true;
 
         try
         {
-            CurrentDiff = await _gitService.GetDiffAsync(RepositoryPath, change);
+            var diff = await _gitService.GetDiffAsync(repoPath, change);
+
+            // The user selected another file while this one was loading.
+            if (_diffRequestToken != token) return;
+            CurrentDiff = diff;
         }
         catch (Exception ex)
         {
+            if (_diffRequestToken != token) return;
             CurrentDiff = null;
             ErrorMessage = $"Failed to load diff: {ex.Message}";
+        }
+        finally
+        {
+            if (_diffRequestToken == token) IsLoadingDiff = false;
         }
     }
 

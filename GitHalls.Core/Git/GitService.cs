@@ -84,6 +84,35 @@ public class GitService
         return _logParser.Parse(result.StandardOutput);
     }
 
+    /// <summary>
+    /// Paths a commit touched. The empty --pretty=format: suppresses the commit
+    /// header so only the file list comes back.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetCommitChangedPathsAsync(string repoPath, string hash, CancellationToken cancellationToken = default)
+    {
+        var result = await _runner.RunAsync(
+            repoPath,
+            new[] { "show", "--pretty=format:", "--name-only", hash },
+            cancellationToken: cancellationToken);
+
+        return result.StandardOutput
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0)
+            .ToList();
+    }
+
+    /// <summary>Diff a single commit introduced for one path.</summary>
+    public async Task<FileDiff> GetCommitFileDiffAsync(string repoPath, string hash, string filePath, CancellationToken cancellationToken = default)
+    {
+        var result = await _runner.RunAsync(
+            repoPath,
+            new[] { "show", "--no-color", "--pretty=format:", hash, "--", filePath },
+            cancellationToken: cancellationToken);
+
+        return _diffParser.Parse(filePath, result.StandardOutput);
+    }
+
     public async Task<IReadOnlyList<Branch>> GetBranchesAsync(string repoPath, CancellationToken cancellationToken = default)
     {
         var result = await _runner.RunAsync(repoPath, new[] { "branch", "-a", "--no-color" }, cancellationToken: cancellationToken);

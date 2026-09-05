@@ -35,11 +35,6 @@ public sealed partial class MainWindow : Window
 
         MainSelectorBar.SelectedItem = ChangesTab;
 
-        // Navigate up front so the diff pane shows its empty state instead of a
-        // blank frame until the first file is selected.
-        ContentFrame.Navigate(typeof(DiffPage));
-        (ContentFrame.Content as DiffPage)?.UpdateDiff(null);
-
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
 
         _ = ViewModel.InitializeAsync();
@@ -58,13 +53,20 @@ public sealed partial class MainWindow : Window
     private void MainSelectorBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
     {
         var suppressInfo = new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo();
-        if (sender.SelectedItem == ChangesTab)
-        {
-            SidebarFrame.Navigate(typeof(ChangesSidebarPage), ViewModel, suppressInfo);
-        }
-        else if (sender.SelectedItem == HistoryTab)
+
+        // Sidebar and detail pane move together: Changes pairs with the file
+        // diff, History with the commit detail.
+        if (sender.SelectedItem == HistoryTab)
         {
             SidebarFrame.Navigate(typeof(HistorySidebarPage), ViewModel, suppressInfo);
+            ContentFrame.Navigate(typeof(CommitDetailPage), ViewModel, suppressInfo);
+            (ContentFrame.Content as CommitDetailPage)?.Update();
+        }
+        else
+        {
+            SidebarFrame.Navigate(typeof(ChangesSidebarPage), ViewModel, suppressInfo);
+            ContentFrame.Navigate(typeof(DiffPage), null, suppressInfo);
+            (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff);
         }
     }
 
@@ -258,14 +260,19 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (e.PropertyName != nameof(RepositoryViewModel.CurrentDiff)) return;
-
-        if (ContentFrame.Content is not DiffPage diffPage)
+        switch (e.PropertyName)
         {
-            ContentFrame.Navigate(typeof(DiffPage));
-            diffPage = ContentFrame.Content as DiffPage ?? throw new InvalidOperationException("DiffPage failed to load.");
-        }
+            case nameof(RepositoryViewModel.CurrentDiff):
+                // Only if that pane is the one on screen — the History tab owns
+                // the frame while it is selected.
+                (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff);
+                break;
 
-        diffPage.UpdateDiff(ViewModel.CurrentDiff);
+            case nameof(RepositoryViewModel.SelectedCommit):
+            case nameof(RepositoryViewModel.SelectedCommitDetail):
+            case nameof(RepositoryViewModel.IsLoadingCommitDetail):
+                (ContentFrame.Content as CommitDetailPage)?.Update();
+                break;
+        }
     }
 }
