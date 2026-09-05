@@ -4,6 +4,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.UI.Text;
 using System.Collections.ObjectModel;
 
 namespace GitHalls.App.Controls;
@@ -16,12 +17,12 @@ namespace GitHalls.App.Controls;
 /// </summary>
 public sealed class BranchListItem
 {
-    public required string Text { get; init; }
-    public bool IsHeader { get; init; }
-    public bool IsCurrent { get; init; }
+    public string Text { get; set; } = string.Empty;
+    public bool IsHeader { get; set; }
+    public bool IsCurrent { get; set; }
 
     /// <summary>The branch this row stands for. Null for a header.</summary>
-    public Branch? Branch { get; init; }
+    public Branch? Branch { get; set; }
 
     public double FontSize => IsHeader ? 12 : 14;
     public FontWeight FontWeight => IsHeader || IsCurrent ? FontWeights.SemiBold : FontWeights.Normal;
