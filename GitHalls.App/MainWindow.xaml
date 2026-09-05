@@ -95,7 +95,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <CommandBar Grid.Row="0" DefaultLabelPosition="Right" Background="Transparent" IsOpen="False">
+                <CommandBar Grid.Row="0" DefaultLabelPosition="Collapsed" Background="Transparent" IsOpen="False">
                     <CommandBar.Content>
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0" Height="48">
                             <Button x:Name="ToggleSidebarButton" Click="ToggleSidebar_Click"
@@ -103,9 +103,14 @@
                                     Width="36" Height="32" Padding="0"
                                     ToolTipService.ToolTip="Toggle sidebar (Ctrl+B)" />
 
-                            <DropDownButton Content="Repository" Height="32">
+                            <!-- Repository and branch are the same control, built the
+                                 same way, so they line up and open the same. -->
+                            <DropDownButton x:Name="RepositoryButton" Height="32" MinWidth="150" MaxWidth="260"
+                                            HorizontalContentAlignment="Left">
+                                <TextBlock x:Name="RepositoryButtonText" Text="Open Repository"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 <DropDownButton.Flyout>
-                                    <MenuFlyout x:Name="RepositoryFlyout" Opening="RepositoryFlyout_Opening">
+                                    <MenuFlyout x:Name="RepositoryFlyout" Opening="RepositoryFlyout_Opening" Placement="Bottom">
                                         <MenuFlyoutItem Text="Open Repository..." Click="OpenRepo_Click" />
                                         <MenuFlyoutItem Text="Clone Repository..." Click="CloneRepo_Click" />
                                         <MenuFlyoutSeparator x:Name="RecentSeparator" Visibility="Collapsed" />
@@ -113,13 +118,14 @@
                                 </DropDownButton.Flyout>
                             </DropDownButton>
 
-                            <ComboBox x:Name="BranchSelector"
-                                      ItemsSource="{x:Bind ViewModel.Branches, Mode=OneWay}"
-                                      SelectedItem="{x:Bind ViewModel.CurrentBranch, Mode=OneWay}"
-                                      DisplayMemberPath="Name"
-                                      MinWidth="160" MaxWidth="300" Height="32"
-                                      PlaceholderText="Select Branch..."
-                                      SelectionChanged="BranchSelector_SelectionChanged" />
+                            <DropDownButton x:Name="BranchButton" Height="32" MinWidth="150" MaxWidth="260"
+                                            HorizontalContentAlignment="Left">
+                                <TextBlock x:Name="BranchButtonText" Text="Branch"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                <DropDownButton.Flyout>
+                                    <MenuFlyout x:Name="BranchFlyout" Opening="BranchFlyout_Opening" Placement="Bottom" />
+                                </DropDownButton.Flyout>
+                            </DropDownButton>
 
                             <ProgressRing Width="18" Height="18"
                                           IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
@@ -128,14 +134,19 @@
                     </CommandBar.Content>
 
                     <!-- Sync lives here, not in the History sidebar: it acts on the
-                         repository as a whole, like the Swift toolbar SyncButton. -->
-                    <AppBarButton Icon="Download" Label="Pull" Command="{x:Bind ViewModel.PullCommand}" />
-                    <AppBarButton Icon="Upload" Label="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}" Command="{x:Bind ViewModel.PushCommand}" />
-                    <AppBarButton Icon="Sync" Label="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
+                         repository as a whole, like the Swift toolbar SyncButton.
+                         Icon-only with tooltips, except Push — its label is the one
+                         that changes ("Publish Branch"), so it stays readable. -->
+                    <AppBarButton Icon="Sync" ToolTipService.ToolTip="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
+                    <AppBarButton Icon="Download" ToolTipService.ToolTip="Pull" Command="{x:Bind ViewModel.PullCommand}" />
+                    <AppBarButton Icon="Upload" LabelPosition="Right"
+                                  Label="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}"
+                                  ToolTipService.ToolTip="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}"
+                                  Command="{x:Bind ViewModel.PushCommand}" />
                     <AppBarSeparator />
-                    <AppBarButton Icon="Refresh" Label="Refresh" Command="{x:Bind ViewModel.RefreshCommand}" />
-                    <AppBarButton Icon="Shuffle" Label="Merge" Click="MergeBranch_Click" />
-                    <AppBarButton Icon="More" Label="Actions">
+                    <AppBarButton Icon="Refresh" ToolTipService.ToolTip="Refresh (Ctrl+R)" Command="{x:Bind ViewModel.RefreshCommand}" />
+                    <AppBarButton Icon="Shuffle" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
+                    <AppBarButton Icon="More" ToolTipService.ToolTip="Repository actions">
                         <AppBarButton.Flyout>
                             <MenuFlyout>
                                 <MenuFlyoutItem Text="Reveal in File Explorer" Click="RevealInExplorer_Click" />

@@ -18,9 +18,6 @@ public sealed partial class MainWindow : Window
     /// <summary>Sidebar width to restore when it is expanded again.</summary>
     private double _restoreSidebarWidth = 280;
 
-    /// <summary>Guards <see cref="BranchSelector_SelectionChanged"/> against selection changes we caused ourselves.</summary>
-    private bool _suppressBranchSelection;
-
     public RepositoryViewModel ViewModel { get; }
 
     public MainWindow()
@@ -76,22 +73,31 @@ public sealed partial class MainWindow : Window
     {
         // Drop the previously listed recents, keeping the two fixed entries and
         // the separator.
-        var fixedItemCount = 3;
+        const int fixedItemCount = 3;
         while (RepositoryFlyout.Items.Count > fixedItemCount)
         {
             RepositoryFlyout.Items.RemoveAt(RepositoryFlyout.Items.Count - 1);
         }
 
-        var recents = ViewModel.RecentRepositories.Where(p => p != ViewModel.RepositoryPath).ToList();
+        var recents = ViewModel.RecentRepositories
+            .Where(p => !string.Equals(p, ViewModel.RepositoryPath, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         RecentSeparator.Visibility = recents.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         foreach (var path in recents)
         {
-            var item = new MenuFlyoutItem { Text = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) };
+            var item = new MenuFlyoutItem { Text = FolderName(path) };
             ToolTipService.SetToolTip(item, path);
             item.Click += (_, _) => ViewModel.RepositoryPath = path;
             RepositoryFlyout.Items.Add(item);
         }
+    }
+
+    private static string FolderName(string path)
+    {
+        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        return string.IsNullOrEmpty(name) ? path : name;
     }
 
     private async void OpenRepo_Click(object sender, RoutedEventArgs e)
@@ -193,23 +199,58 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void BranchSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    /// <summary>
+    /// Builds the branch list on open: local branches first, then remotes.
+    ///
+    /// This replaced a ComboBox, which had to be defended against its own
+    /// SelectionChanged — repopulating the list on every refresh nulled and
+    /// reassigned SelectedItem, which read as "the user picked a branch" and
+    /// fired a checkout. A menu has no selection state to clobber.
+    /// </summary>
+    private void BranchFlyout_Opening(object? sender, object e)
     {
-        // A refresh repopulating the list raises this event too; acting on it
-        // would check out a branch the user never picked.
-        if (_suppressBranchSelection || ViewModel.IsApplyingBranches) return;
-        if (e.AddedItems.Count == 0 || e.AddedItems[0] is not Branch branch) return;
-        if (branch.Name == ViewModel.CurrentBranch?.Name) return;
+        BranchFlyout.Items.Clear();
 
-        _suppressBranchSelection = true;
-        try
+        var current = ViewModel.CurrentBranch?.Name;
+        var locals = ViewModel.Branches.Where(b => !b.IsRemote).ToList();
+        var remotes = ViewModel.Branches.Where(b => b.IsRemote).ToList();
+
+        if (locals.Count == 0 && remotes.Count == 0)
         {
-            await ViewModel.CheckoutBranchAsync(branch);
+            BranchFlyout.Items.Add(new MenuFlyoutItem { Text = "No branches", IsEnabled = false });
+            return;
         }
-        finally
+
+        foreach (var branch in locals)
         {
-            _suppressBranchSelection = false;
+            BranchFlyout.Items.Add(BuildBranchItem(branch, isCurrent: branch.Name == current));
         }
+
+        if (remotes.Count > 0)
+        {
+            if (locals.Count > 0) BranchFlyout.Items.Add(new MenuFlyoutSeparator());
+            foreach (var branch in remotes)
+            {
+                BranchFlyout.Items.Add(BuildBranchItem(branch, isCurrent: false));
+            }
+        }
+    }
+
+    private MenuFlyoutItem BuildBranchItem(Branch branch, bool isCurrent)
+    {
+        var item = new MenuFlyoutItem
+        {
+            Text = branch.Name,
+            IsEnabled = !isCurrent
+        };
+
+        if (isCurrent)
+        {
+            item.Icon = new FontIcon { Glyph = "\uE73E" }; // checkmark
+        }
+
+        item.Click += async (_, _) => await ViewModel.CheckoutBranchAsync(branch);
+        return item;
     }
 
     // MARK: - Quick actions
@@ -254,14 +295,22 @@ public sealed partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(RepositoryViewModel.RepositoryPath))
         {
-            TitleBarText.Text = string.IsNullOrEmpty(ViewModel.RepositoryPath)
-                ? "GitHalls"
-                : $"GitHalls — {Path.GetFileName(ViewModel.RepositoryPath.TrimEnd(Path.DirectorySeparatorChar))}";
+            var hasRepo = !string.IsNullOrEmpty(ViewModel.RepositoryPath);
+            var name = hasRepo ? FolderName(ViewModel.RepositoryPath!) : null;
+
+            TitleBarText.Text = name == null ? "GitHalls" : $"GitHalls — {name}";
+            RepositoryButtonText.Text = name ?? "Open Repository";
+            ToolTipService.SetToolTip(RepositoryButton, ViewModel.RepositoryPath ?? "No repository open");
             return;
         }
 
         switch (e.PropertyName)
         {
+            case nameof(RepositoryViewModel.CurrentBranch):
+                BranchButtonText.Text = ViewModel.CurrentBranch?.Name ?? "Branch";
+                ToolTipService.SetToolTip(BranchButton, ViewModel.CurrentBranch?.Name ?? "No branch");
+                break;
+
             case nameof(RepositoryViewModel.CurrentDiff):
                 // Only if that pane is the one on screen — the History tab owns
                 // the frame while it is selected.
