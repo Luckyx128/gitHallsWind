@@ -8,7 +8,9 @@
 
     <!-- Pull/Push/Fetch used to live here. They act on the repository, not on
          the history list, so they moved to the main toolbar. -->
-    <ListView ItemsSource="{x:Bind ViewModel.Commits, Mode=OneWay}" SelectionMode="Single">
+    <ListView ItemsSource="{x:Bind ViewModel.Commits, Mode=OneWay}"
+              SelectedItem="{x:Bind ViewModel.SelectedCommit, Mode=TwoWay}"
+              SelectionMode="Single">
         <ListView.ItemTemplate>
             <DataTemplate x:DataType="models:Commit">
                 <Grid Padding="4,10">

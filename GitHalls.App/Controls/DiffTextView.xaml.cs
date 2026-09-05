@@ -58,6 +58,18 @@ public sealed partial class DiffTextView : UserControl
     private int _firstPaintedRow = -1;
     private int _lastPaintedRow = -1;
 
+    /// <summary>
+    /// Height cap when the control sizes itself to its content instead of
+    /// filling the pane — the mode used for the per-file sections of a commit,
+    /// which stack inside an outer scroll. NaN means "fill the pane".
+    ///
+    /// Past the cap the inner scroller takes over, so one enormous file in a
+    /// commit can't push every section below it off the screen.
+    /// </summary>
+    public double MaxIntrinsicHeight { get; set; } = double.NaN;
+
+    private bool IsIntrinsic => !double.IsNaN(MaxIntrinsicHeight);
+
     public DiffTextView() : this(ColorCodeDiffHighlighter.Instance) { }
 
     public DiffTextView(IDiffHighlighter highlighter)
@@ -98,6 +110,8 @@ public sealed partial class DiffTextView : UserControl
             TintLayer.Children.Clear();
             GutterLayer.Children.Clear();
             ShowRemainingButton.Visibility = Visibility.Collapsed;
+            _renderedLineCount = 0;
+            ApplyIntrinsicHeight();
             return;
         }
 
@@ -115,11 +129,30 @@ public sealed partial class DiffTextView : UserControl
         UpdateContentSize();
         RepaintLayers(force: true);
 
+        ApplyIntrinsicHeight();
+
         var remaining = _diff.Lines.Count - _renderedLineCount;
         ShowRemainingButton.Content = $"Show remaining {remaining:N0} lines";
         ShowRemainingButton.Visibility = remaining > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         Scroller.ChangeView(0, 0, null, disableAnimation: true);
+    }
+
+    /// <summary>
+    /// In intrinsic mode the control asks for exactly the height its rows need,
+    /// so an outer ScrollViewer can stack several of these. Filling the pane is
+    /// the default and needs no explicit height.
+    /// </summary>
+    private void ApplyIntrinsicHeight()
+    {
+        if (!IsIntrinsic)
+        {
+            Height = double.NaN;
+            return;
+        }
+
+        var content = _renderedLineCount * DiffTextTheme.LineHeight + 2;
+        Height = Math.Max(DiffTextTheme.LineHeight, Math.Min(content, MaxIntrinsicHeight));
     }
 
     private void ShowRemaining_Click(object sender, RoutedEventArgs e)

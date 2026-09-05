@@ -1,0 +1,45 @@
+<Page
+    x:Class="GitHalls.App.Views.CommitDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Grid>
+        <!-- Empty / loading states, mirroring the Swift ContentUnavailableView -->
+        <StackPanel x:Name="PlaceholderPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+            <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                       HorizontalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            <TextBlock x:Name="PlaceholderText" Text="Select a commit"
+                       HorizontalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+
+        <ProgressRing x:Name="LoadingRing" IsActive="False" Visibility="Collapsed"
+                      Width="32" Height="32"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+        <ScrollViewer x:Name="DetailScroller" Visibility="Collapsed"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
+            <StackPanel Spacing="16" Padding="16">
+
+                <StackPanel Spacing="6">
+                    <TextBlock x:Name="SummaryText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock x:Name="AuthorText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="·" FontSize="13" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="DateText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="·" FontSize="13" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="HashText" FontSize="13" FontFamily="Cascadia Mono, Consolas"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    </StackPanel>
+                    <TextBlock x:Name="BodyText" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
+                </StackPanel>
+
+                <!-- One collapsible section per file, filled in code-behind. -->
+                <StackPanel x:Name="FileSections" Spacing="12" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

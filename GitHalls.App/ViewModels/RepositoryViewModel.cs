@@ -57,6 +57,27 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private FileDiff? _currentDiff;
 
     [ObservableProperty]
+    private bool _isLoadingDiff;
+
+    [ObservableProperty]
+    private Commit? _selectedCommit;
+
+    [ObservableProperty]
+    private CommitDetail? _selectedCommitDetail;
+
+    [ObservableProperty]
+    private bool _isLoadingCommitDetail;
+
+    /// <summary>
+    /// Identifies the most recent async load of each kind. A slow response for
+    /// a selection the user has already moved away from must not overwrite what
+    /// is on screen, so every load checks its token is still current before
+    /// publishing anything.
+    /// </summary>
+    private Guid _diffRequestToken;
+    private Guid _commitDetailRequestToken;
+
+    [ObservableProperty]
     private Branch? _currentBranch;
 
     [ObservableProperty]
@@ -90,13 +111,6 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     public bool HasSelectedChange => SelectedChange != null;
 
-    /// <summary>
-    /// True while <see cref="RefreshAsync"/> is repopulating <see cref="Branches"/>.
-    /// The branch picker has to ignore its own SelectionChanged during that window,
-    /// or repopulating the list checks out a branch nobody asked for.
-    /// </summary>
-    public bool IsApplyingBranches { get; private set; }
-
     public RepositoryViewModel(GitService gitService, SettingsStore settingsStore)
     {
         _gitService = gitService;
@@ -114,9 +128,16 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         var settings = await _settingsStore.LoadAsync();
 
         RecentRepositories.Clear();
-        foreach (var path in settings.RecentRepositories.Where(Directory.Exists))
+        foreach (var path in settings.RecentRepositories)
         {
-            RecentRepositories.Add(path);
+            // Drop repositories that were moved or deleted since last time, and
+            // collapse entries that differ only in casing or a trailing slash.
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) continue;
+
+            var normalized = NormalizePath(path);
+            if (RecentRepositories.Any(r => SamePath(r, normalized))) continue;
+
+            RecentRepositories.Add(normalized);
         }
 
         if (!string.IsNullOrEmpty(settings.LastOpenedRepository) && Directory.Exists(settings.LastOpenedRepository))
@@ -131,11 +152,21 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         SelectedChange = null;
         CurrentDiff = null;
+        SelectedCommit = null;
+        SelectedCommitDetail = null;
         ErrorMessage = null;
 
         if (string.IsNullOrEmpty(value)) return;
 
-        PromoteRecent(value);
+        var normalized = NormalizePath(value);
+        if (!SamePath(normalized, value))
+        {
+            // Re-enters this handler with the canonical form.
+            RepositoryPath = normalized;
+            return;
+        }
+
+        PromoteRecent(normalized);
         StartAutoRefresh();
         _ = RefreshAsync();
     }
@@ -160,19 +191,110 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         }
     }
 
+    partial void OnSelectedCommitChanged(Commit? value)
+    {
+        _ = LoadCommitDetailAsync();
+    }
+
+    private async Task LoadCommitDetailAsync()
+    {
+        var repoPath = RepositoryPath;
+        var commit = SelectedCommit;
+
+        if (string.IsNullOrEmpty(repoPath) || commit == null)
+        {
+            SelectedCommitDetail = null;
+            return;
+        }
+
+        var token = Guid.NewGuid();
+        _commitDetailRequestToken = token;
+        IsLoadingCommitDetail = true;
+
+        try
+        {
+            var paths = await _gitService.GetCommitChangedPathsAsync(repoPath, commit.Hash);
+
+            var diffs = new List<FileDiff>(paths.Count);
+            foreach (var path in paths)
+            {
+                if (_commitDetailRequestToken != token) return;
+                diffs.Add(await _gitService.GetCommitFileDiffAsync(repoPath, commit.Hash, path));
+            }
+
+            if (_commitDetailRequestToken != token) return;
+            SelectedCommitDetail = new CommitDetail(commit, diffs);
+        }
+        catch (Exception ex)
+        {
+            if (_commitDetailRequestToken != token) return;
+            SelectedCommitDetail = null;
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            if (_commitDetailRequestToken == token) IsLoadingCommitDetail = false;
+        }
+    }
+
+    private const int MaxRecentRepositories = 10;
+
+    /// <summary>
+    /// Canonical form of a repository path, so the same repository is never
+    /// listed twice. Windows paths reach us from three places — the folder
+    /// picker, a clone, and the settings file — and they disagree about
+    /// trailing separators and casing.
+    /// </summary>
+    public static string NormalizePath(string path)
+    {
+        try
+        {
+            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        }
+        catch
+        {
+            // GetFullPath throws on a malformed path; the raw value still beats
+            // dropping the entry entirely.
+            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+    }
+
+    private static bool SamePath(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
     private void PromoteRecent(string path)
     {
-        var existing = RecentRepositories.IndexOf(path);
-        if (existing >= 0) RecentRepositories.RemoveAt(existing);
-        RecentRepositories.Insert(0, path);
-        while (RecentRepositories.Count > 10) RecentRepositories.RemoveAt(RecentRepositories.Count - 1);
+        var normalized = NormalizePath(path);
 
-        _ = _settingsStore.SaveAsync(new AppSettings
+        for (int i = RecentRepositories.Count - 1; i >= 0; i--)
         {
-            RecentRepositories = RecentRepositories.ToList(),
-            LastOpenedRepository = path
-        });
+            if (SamePath(RecentRepositories[i], normalized)) RecentRepositories.RemoveAt(i);
+        }
+
+        RecentRepositories.Insert(0, normalized);
+        while (RecentRepositories.Count > MaxRecentRepositories)
+        {
+            RecentRepositories.RemoveAt(RecentRepositories.Count - 1);
+        }
+
+        Save();
     }
+
+    /// <summary>Forgets a repository without opening it. Mirrors the Swift forgetRecent.</summary>
+    public void ForgetRecent(string path)
+    {
+        var normalized = NormalizePath(path);
+        for (int i = RecentRepositories.Count - 1; i >= 0; i--)
+        {
+            if (SamePath(RecentRepositories[i], normalized)) RecentRepositories.RemoveAt(i);
+        }
+        Save();
+    }
+
+    private void Save() => _ = _settingsStore.SaveAsync(new AppSettings
+    {
+        RecentRepositories = RecentRepositories.ToList(),
+        LastOpenedRepository = RepositoryPath
+    });
 
     [RelayCommand]
     public async Task RefreshAsync()
@@ -222,9 +344,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
             SelectedChange = Changes.FirstOrDefault(c => c.Path == SelectedChange.Path);
         }
 
-        var commits = await _gitService.GetLogAsync(repoPath);
-        Commits.Clear();
-        foreach (var c in commits) Commits.Add(c);
+        // Merged in place for the same reason as the branch list: clearing it
+        // drops the History selection, and the periodic refresh would then close
+        // the commit detail the user is reading every minute.
+        MergeCommits(await _gitService.GetLogAsync(repoPath));
 
         var branches = await _gitService.GetBranchesAsync(repoPath);
         MergeBranches(branches);
@@ -237,6 +360,26 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Replaces only what actually changed, so the list doesn't flicker.</summary>
+    private void MergeCommits(IReadOnlyList<Commit> commits)
+    {
+        for (int i = Commits.Count - 1; i >= 0; i--)
+        {
+            if (!commits.Any(c => c.Hash == Commits[i].Hash)) Commits.RemoveAt(i);
+        }
+
+        for (int i = 0; i < commits.Count; i++)
+        {
+            if (Commits.Any(c => c.Hash == commits[i].Hash)) continue;
+            Commits.Insert(Math.Min(i, Commits.Count), commits[i]);
+        }
+
+        // The selected commit was rewritten or dropped (amend, rebase, reset).
+        if (SelectedCommit != null && !Commits.Any(c => c.Hash == SelectedCommit.Hash))
+        {
+            SelectedCommit = null;
+        }
+    }
+
     private void MergeChanges(IReadOnlyList<FileChange> status)
     {
         for (int i = Changes.Count - 1; i >= 0; i--)
@@ -263,16 +406,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         CommitCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>
-    /// Same in-place merge as <see cref="MergeChanges"/>, and for a sharper
-    /// reason: clearing this collection nulls the branch picker's SelectedItem,
-    /// and repopulating it then raises SelectionChanged with a brand-new object
-    /// — which used to read as "the user picked a branch" and fire a checkout.
-    /// </summary>
+    /// <summary>Same in-place merge as <see cref="MergeChanges"/>, to avoid flicker.</summary>
     private void MergeBranches(IReadOnlyList<Branch> branches)
     {
-        IsApplyingBranches = true;
-        try
         {
             for (int i = Branches.Count - 1; i >= 0; i--)
             {
@@ -296,24 +432,34 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
             CurrentBranch = Branches.FirstOrDefault(b => b.IsCurrent);
         }
-        finally
-        {
-            IsApplyingBranches = false;
-        }
     }
 
     private async Task LoadDiffAsync(FileChange change)
     {
-        if (string.IsNullOrEmpty(RepositoryPath)) return;
+        var repoPath = RepositoryPath;
+        if (string.IsNullOrEmpty(repoPath)) return;
+
+        var token = Guid.NewGuid();
+        _diffRequestToken = token;
+        IsLoadingDiff = true;
 
         try
         {
-            CurrentDiff = await _gitService.GetDiffAsync(RepositoryPath, change);
+            var diff = await _gitService.GetDiffAsync(repoPath, change);
+
+            // The user selected another file while this one was loading.
+            if (_diffRequestToken != token) return;
+            CurrentDiff = diff;
         }
         catch (Exception ex)
         {
+            if (_diffRequestToken != token) return;
             CurrentDiff = null;
             ErrorMessage = $"Failed to load diff: {ex.Message}";
+        }
+        finally
+        {
+            if (_diffRequestToken == token) IsLoadingDiff = false;
         }
     }
 
