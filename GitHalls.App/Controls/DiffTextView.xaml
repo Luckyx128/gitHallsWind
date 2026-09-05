@@ -19,12 +19,16 @@
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 Background="{ThemeResource LayerFillColorDefaultBrush}">
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBox x:Name="FindTextBox" Width="240" PlaceholderText="Find in diff"
+                <TextBox x:Name="FindTextBox" Width="240" Height="32" PlaceholderText="Find in diff"
                          TextChanged="FindTextBox_TextChanged" KeyDown="FindTextBox_KeyDown" />
-                <Button Content="&#xE70E;" FontFamily="Segoe MDL2 Assets" Click="FindPrevious_Click" ToolTipService.ToolTip="Previous" />
-                <Button Content="&#xE70D;" FontFamily="Segoe MDL2 Assets" Click="FindNext_Click" ToolTipService.ToolTip="Next" />
-                <TextBlock x:Name="FindStatusText" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Click="CloseFind_Click" ToolTipService.ToolTip="Close" />
+                <Button Content="&#xE70E;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        Width="32" Height="32" Padding="0" Click="FindPrevious_Click" ToolTipService.ToolTip="Previous" />
+                <Button Content="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        Width="32" Height="32" Padding="0" Click="FindNext_Click" ToolTipService.ToolTip="Next" />
+                <TextBlock x:Name="FindStatusText" VerticalAlignment="Center" MinWidth="72"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        Width="32" Height="32" Padding="0" Click="CloseFind_Click" ToolTipService.ToolTip="Close (Esc)" />
             </StackPanel>
         </Border>
 

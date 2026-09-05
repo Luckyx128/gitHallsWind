@@ -100,6 +100,22 @@ public class GitService
         await _runner.RunAsync(repoPath, new[] { "restore", "--staged", "--", filePath }, cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// Stages an explicit list of paths. Not the same as "add ." — that also
+    /// picks up whatever appeared on disk since the list was rendered.
+    /// </summary>
+    public async Task StageAsync(string repoPath, IReadOnlyCollection<string> paths, CancellationToken cancellationToken = default)
+    {
+        if (paths.Count == 0) return;
+        await _runner.RunAsync(repoPath, new[] { "add", "--" }.Concat(paths), cancellationToken: cancellationToken);
+    }
+
+    public async Task UnstageAsync(string repoPath, IReadOnlyCollection<string> paths, CancellationToken cancellationToken = default)
+    {
+        if (paths.Count == 0) return;
+        await _runner.RunAsync(repoPath, new[] { "restore", "--staged", "--" }.Concat(paths), cancellationToken: cancellationToken);
+    }
+
     public async Task CommitAsync(string repoPath, string message, CancellationToken cancellationToken = default)
     {
         await _runner.RunAsync(repoPath, new[] { "commit", "-m", message }, cancellationToken: cancellationToken);

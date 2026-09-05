@@ -62,6 +62,34 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _pushButtonLabel = "Push";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanCommit))]
+    [NotifyCanExecuteChangedFor(nameof(CommitCommand))]
+    private string _commitMessage = string.Empty;
+
+    /// <summary>
+    /// Tri-state for the "stage all" checkbox: true = everything staged,
+    /// false = nothing staged, null = a mix. Mirrors the Swift `allStaged`,
+    /// with the indeterminate case the Mac list shows implicitly.
+    /// </summary>
+    public bool? StagedState
+    {
+        get
+        {
+            if (Changes.Count == 0) return false;
+            if (Changes.All(c => c.IsStaged)) return true;
+            if (Changes.All(c => !c.IsStaged)) return false;
+            return null;
+        }
+    }
+
+    /// <summary>Committing needs both something staged and something to say about it.</summary>
+    public bool CanCommit => !IsBusy
+        && !string.IsNullOrWhiteSpace(CommitMessage)
+        && Changes.Any(c => c.IsStaged);
+
+    public bool HasSelectedChange => SelectedChange != null;
+
     /// <summary>
     /// True while <see cref="RefreshAsync"/> is repopulating <see cref="Branches"/>.
     /// The branch picker has to ignore its own SelectionChanged during that window,
@@ -112,8 +140,16 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         _ = RefreshAsync();
     }
 
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanCommit));
+        CommitCommand.NotifyCanExecuteChanged();
+    }
+
     partial void OnSelectedChangeChanged(FileChange? value)
     {
+        OnPropertyChanged(nameof(HasSelectedChange));
+
         if (value != null && !string.IsNullOrEmpty(RepositoryPath))
         {
             _ = LoadDiffAsync(value);
@@ -220,6 +256,11 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
                 Changes[Changes.IndexOf(existing)] = change;
             }
         }
+
+        // All derived from the list, and none is recomputed on its own.
+        OnPropertyChanged(nameof(StagedState));
+        OnPropertyChanged(nameof(CanCommit));
+        CommitCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -282,10 +323,19 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         await RunGitAsync(path => _gitService.StageAsync(path, change.Path));
     }
 
-    [RelayCommand]
-    public async Task StageAllAsync()
+    /// <summary>
+    /// Stages or unstages every listed file. Takes the paths explicitly rather
+    /// than running "add ." so it can also go the other way, and so it never
+    /// picks up a file that appeared after the list was rendered.
+    /// </summary>
+    public async Task SetAllStagedAsync(bool staged)
     {
-        await RunGitAsync(path => _gitService.StageAsync(path, "."));
+        var paths = Changes.Select(c => c.Path).ToList();
+        if (paths.Count == 0) return;
+
+        await RunGitAsync(path => staged
+            ? _gitService.StageAsync(path, paths)
+            : _gitService.UnstageAsync(path, paths));
     }
 
     [RelayCommand]
@@ -294,11 +344,16 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         await RunGitAsync(path => _gitService.UnstageAsync(path, change.Path));
     }
 
-    [RelayCommand]
-    public async Task CommitAsync(string message)
+    [RelayCommand(CanExecute = nameof(CanCommit))]
+    public async Task CommitAsync()
     {
-        if (string.IsNullOrWhiteSpace(message)) return;
+        if (!CanCommit) return;
+
+        var message = CommitMessage;
         await RunGitAsync(path => _gitService.CommitAsync(path, message));
+
+        // Keep the message on failure — it is the one thing the user typed by hand.
+        if (!HasError) CommitMessage = string.Empty;
     }
 
     /// <summary>

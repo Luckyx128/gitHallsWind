@@ -10,8 +10,13 @@ namespace GitHalls.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const double DefaultSidebarMinWidth = 220;
+
     private readonly GitService _gitService = new();
     private readonly PlatformActions _platformActions = new();
+
+    /// <summary>Sidebar width to restore when it is expanded again.</summary>
+    private double _restoreSidebarWidth = 280;
 
     /// <summary>Guards <see cref="BranchSelector_SelectionChanged"/> against selection changes we caused ourselves.</summary>
     private bool _suppressBranchSelection;
@@ -218,6 +223,26 @@ public sealed partial class MainWindow : Window
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>Collapses the sidebar to zero width and back, remembering the width it had.</summary>
+    private void ToggleSidebar_Click(object sender, RoutedEventArgs e)
+    {
+        if (SidebarColumn.ActualWidth > 0)
+        {
+            _restoreSidebarWidth = SidebarColumn.ActualWidth;
+            SidebarColumn.MinWidth = 0;
+            SidebarColumn.Width = new GridLength(0);
+            Sidebar.Visibility = Visibility.Collapsed;
+            SidebarSplitter.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            SidebarColumn.MinWidth = DefaultSidebarMinWidth;
+            SidebarColumn.Width = new GridLength(_restoreSidebarWidth);
+            Sidebar.Visibility = Visibility.Visible;
+            SidebarSplitter.Visibility = Visibility.Visible;
+        }
+    }
 
     private void ErrorBar_CloseButtonClick(InfoBar sender, object args) => ViewModel.ClearError();
 

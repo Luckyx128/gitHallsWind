@@ -18,8 +18,28 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,8">
-            <CheckBox Content="Stage All Changes" Command="{x:Bind ViewModel.StageAllCommand}" />
+        <Border Grid.Row="0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="12,6,8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Three-state: checked = all staged, indeterminate = some, unchecked = none. -->
+                <CheckBox x:Name="StageAllCheckBox" Grid.Column="0"
+                          Content="Stage All Changes"
+                          IsThreeState="True"
+                          IsChecked="{x:Bind ViewModel.StagedState, Mode=OneWay}"
+                          Click="StageAllCheckBox_Click"
+                          VerticalAlignment="Center" />
+
+                <Button Grid.Column="1"
+                        Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                        Width="32" Height="32" Padding="0"
+                        IsEnabled="{x:Bind ViewModel.HasSelectedChange, Mode=OneWay}"
+                        Click="DiscardButton_Click"
+                        ToolTipService.ToolTip="Discard changes in the selected file" />
+            </Grid>
         </Border>
 
         <ListView x:Name="ChangesList" Grid.Row="1" ItemsSource="{x:Bind ViewModel.Changes, Mode=OneWay}"
@@ -42,9 +62,10 @@
                         <CheckBox Grid.Column="0" IsChecked="{x:Bind IsStaged, Mode=OneWay}"
                                   Click="ChangeCheckBox_Click" Tag="{x:Bind}" Margin="0,0,8,0" MinWidth="0" />
 
-                        <StackPanel Orientation="Vertical" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
-                            <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{x:Bind DirectoryPath}" FontSize="12" Foreground="Gray" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Vertical" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0"
+                                    ToolTipService.ToolTip="{x:Bind Path}">
+                            <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                            <TextBlock Text="{x:Bind DirectoryPath}" FontSize="12" Foreground="Gray" TextTrimming="CharacterEllipsis" MaxLines="1" />
                         </StackPanel>
 
                         <Border Grid.Column="2" Background="{x:Bind BadgeColorHex, Converter={StaticResource ColorConverter}}"
@@ -56,9 +77,15 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <StackPanel Grid.Row="2" Padding="12" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
-            <TextBox x:Name="CommitMessageTextBox" PlaceholderText="Commit message" AcceptsReturn="True" Height="80" />
-            <Button Content="Commit" HorizontalAlignment="Stretch" Margin="0,8,0,0" Click="CommitButton_Click" />
+        <StackPanel Grid.Row="2" Padding="12" Spacing="8"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <TextBox x:Name="CommitMessageTextBox"
+                     PlaceholderText="Commit message"
+                     AcceptsReturn="True" Height="80" TextWrapping="Wrap"
+                     Text="{x:Bind ViewModel.CommitMessage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <Button Content="Commit" HorizontalAlignment="Stretch"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Command="{x:Bind ViewModel.CommitCommand}" />
         </StackPanel>
     </Grid>
 </Page>

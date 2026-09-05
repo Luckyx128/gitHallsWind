@@ -32,16 +32,18 @@ public sealed partial class ChangesSidebarPage : Page
         }
     }
 
-    private async void CommitButton_Click(object sender, RoutedEventArgs e)
+    private async void StageAllCheckBox_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(CommitMessageTextBox.Text)) return;
+        // The click already flipped the visual state; the view model still holds
+        // the state we are toggling away from, so decide from that. Anything but
+        // "everything is staged" means the useful action is to stage.
+        var stage = ViewModel.StagedState != true;
 
-        var message = CommitMessageTextBox.Text;
-        await ViewModel.CommitAsync(message);
+        await ViewModel.SetAllStagedAsync(stage);
 
-        // Only clear the box if the commit actually went through — otherwise the
-        // user loses the message they just typed along with the failure.
-        if (!ViewModel.HasError) CommitMessageTextBox.Text = "";
+        // The OneWay binding only repaints when StagedState actually changed, so
+        // a failed git call would otherwise leave the box lying about the state.
+        StageAllCheckBox.IsChecked = ViewModel.StagedState;
     }
 
     private void ChangeCheckBox_Click(object sender, RoutedEventArgs e)
@@ -68,8 +70,13 @@ public sealed partial class ChangesSidebarPage : Page
     }
 
     private async void DiscardMenuItem_Click(object sender, RoutedEventArgs e)
+        => await ConfirmAndDiscardAsync(_contextChange);
+
+    private async void DiscardButton_Click(object sender, RoutedEventArgs e)
+        => await ConfirmAndDiscardAsync(ChangesList.SelectedItem as FileChange);
+
+    private async Task ConfirmAndDiscardAsync(FileChange? change)
     {
-        var change = _contextChange;
         if (change == null) return;
 
         // Discarding cannot be undone through git, so it always asks first.
