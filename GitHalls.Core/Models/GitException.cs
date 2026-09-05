@@ -9,7 +9,7 @@ public class GitException : Exception
         RawError = rawError;
     }
 
-    public static GitException Parse(string rawError)
+    public static GitException Parse(string? rawError)
     {
         var error = rawError?.Trim() ?? string.Empty;
         var friendlyMessage = GetFriendlyMessage(error);

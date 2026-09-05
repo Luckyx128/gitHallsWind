@@ -15,11 +15,11 @@ public enum FileChangeStatus
 public class FileChange
 {
     public string Path { get; }
-    public string OriginalPath { get; } // For renames
+    public string? OriginalPath { get; } // For renames
     public FileChangeStatus IndexStatus { get; }
     public FileChangeStatus WorkTreeStatus { get; }
 
-    public FileChange(string path, FileChangeStatus indexStatus, FileChangeStatus workTreeStatus, string originalPath = null)
+    public FileChange(string path, FileChangeStatus indexStatus, FileChangeStatus workTreeStatus, string? originalPath = null)
     {
         Path = path;
         IndexStatus = indexStatus;

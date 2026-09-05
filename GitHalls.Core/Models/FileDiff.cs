@@ -5,12 +5,19 @@ public enum DiffLineType
     Context,
     Addition,
     Deletion,
-    Header,
-    Empty
+    /// <summary>
+    /// A friendly stand-in for git's raw "@@ -1,4 +1,5 @@" syntax, and the
+    /// carrier for one-off notices ("Binary file not shown", "No content changes").
+    /// </summary>
+    HunkHeader
 }
 
 public class DiffLine
 {
+    /// <summary>
+    /// Code content only — the leading '+', '-' or ' ' marker is stripped, it
+    /// belongs to the gutter, not to the selectable text.
+    /// </summary>
     public string Content { get; }
     public DiffLineType Type { get; }
     public int? OldLineNumber { get; }
@@ -23,11 +30,6 @@ public class DiffLine
         OldLineNumber = oldLineNumber;
         NewLineNumber = newLineNumber;
     }
-
-    public bool IsChangeLine => Type == DiffLineType.Addition || Type == DiffLineType.Deletion;
-    
-    // For UI selection/staging
-    public bool IsSelected { get; set; } = false;
 }
 
 public class FileDiff

@@ -23,7 +23,7 @@ public class StatusParser
             var indexStatus = MapStatus(indexStatusChar);
             var workTreeStatus = MapStatus(workTreeStatusChar);
 
-            string originalPath = null;
+            string? originalPath = null;
             if (indexStatus == FileChangeStatus.Renamed || indexStatus == FileChangeStatus.Copied ||
                 workTreeStatus == FileChangeStatus.Renamed || workTreeStatus == FileChangeStatus.Copied)
             {

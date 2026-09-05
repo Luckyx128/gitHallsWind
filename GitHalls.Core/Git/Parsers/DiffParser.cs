@@ -1,85 +1,138 @@
+using System.Text;
 using GitHalls.Core.Models;
 
 namespace GitHalls.Core.Git.Parsers;
 
 public class DiffParser
 {
+    public const string BinaryFileText = "Binary file not shown";
+    public const string MergeDiffText = "Merge diff not supported";
+    public const string NoContentChangesText = "No content changes";
+
     public FileDiff Parse(string filePath, string diffOutput)
     {
-        if (diffOutput.Contains("Binary files differ") || diffOutput.StartsWith("Binary files"))
+        if (string.IsNullOrEmpty(diffOutput))
         {
-            return new FileDiff(filePath, Array.Empty<DiffLine>(), isBinary: true);
+            return new FileDiff(filePath, new[] { HunkHeader(NoContentChangesText) });
         }
 
         var lines = new List<DiffLine>();
         var stringLines = diffOutput.Split('\n');
-        
-        int? oldLineNumber = null;
-        int? newLineNumber = null;
+
+        int oldLineNumber = 0;
+        int newLineNumber = 0;
+        bool insideHunk = false;
 
         foreach (var line in stringLines)
         {
-            if (line.StartsWith("diff --git") || line.StartsWith("index ") || 
-                line.StartsWith("--- ") || line.StartsWith("+++ "))
+            if (line.StartsWith("Binary files ") && line.EndsWith(" differ"))
             {
-                // Skip file headers since we display the file name in our own UI
+                return new FileDiff(filePath, new[] { HunkHeader(BinaryFileText) }, isBinary: true);
+            }
+
+            // A merge commit diff ("@@@ -a,b -c,d +e,f @@@") uses the combined
+            // format — several "@@" markers and a multi-character prefix per
+            // line — which this parser doesn't understand. Better to say so
+            // than to parse it and corrupt the content.
+            if (line.StartsWith("@@@"))
+            {
+                return new FileDiff(filePath, new[] { HunkHeader(MergeDiffText) });
+            }
+
+            if (line.StartsWith("@@"))
+            {
+                ParseHunkHeader(line, ref oldLineNumber, ref newLineNumber, out var label);
+                lines.Add(HunkHeader(label));
+                insideHunk = true;
                 continue;
             }
 
-            if (line.StartsWith("@@ "))
-            {
-                ParseHunkHeader(line, out oldLineNumber, out newLineNumber);
-                // We keep the line numbers updated but don't show the @@ line itself
-                continue;
-            }
+            // Anything before the first "@@" is git's extended header
+            // (diff --git, index, ---, +++, new/deleted file mode,
+            // rename from/to, similarity index...) — skip it.
+            if (!insideHunk) continue;
 
-            if (line.StartsWith("+"))
+            // "\ No newline at end of file" is a git marker, not file content.
+            if (line.StartsWith("\\")) continue;
+
+            if (line.Length == 0) continue;
+
+            switch (line[0])
             {
-                lines.Add(new DiffLine(line, DiffLineType.Addition, null, newLineNumber));
-                newLineNumber++;
+                case '+':
+                    lines.Add(new DiffLine(line.Substring(1), DiffLineType.Addition, null, newLineNumber));
+                    newLineNumber++;
+                    break;
+                case '-':
+                    lines.Add(new DiffLine(line.Substring(1), DiffLineType.Deletion, oldLineNumber, null));
+                    oldLineNumber++;
+                    break;
+                default:
+                    lines.Add(new DiffLine(line.Substring(1), DiffLineType.Context, oldLineNumber, newLineNumber));
+                    oldLineNumber++;
+                    newLineNumber++;
+                    break;
             }
-            else if (line.StartsWith("-"))
-            {
-                lines.Add(new DiffLine(line, DiffLineType.Deletion, oldLineNumber, null));
-                oldLineNumber++;
-            }
-            else if (line.StartsWith(" "))
-            {
-                lines.Add(new DiffLine(line, DiffLineType.Context, oldLineNumber, newLineNumber));
-                oldLineNumber++;
-                newLineNumber++;
-            }
-            else if (string.IsNullOrEmpty(line))
-            {
-                continue;
-            }
-            else
-            {
-                // Fallback for unexpected line types, like \ No newline at end of file
-                lines.Add(new DiffLine(line, DiffLineType.Context, null, null));
-            }
+        }
+
+        if (lines.Count == 0)
+        {
+            // Mode change or a pure rename with no content change — that is not
+            // the same thing as "no diff at all".
+            lines.Add(HunkHeader(NoContentChangesText));
         }
 
         return new FileDiff(filePath, lines);
     }
 
-    private void ParseHunkHeader(string header, out int? oldLine, out int? newLine)
+    private static DiffLine HunkHeader(string text) => new(text, DiffLineType.HunkHeader, null, null);
+
+    /// <summary>
+    /// Reads "@@ -1,4 +1,5 @@ optional context" into the two starting line
+    /// numbers, and builds the friendly label shown in place of the raw syntax.
+    /// </summary>
+    private static void ParseHunkHeader(string header, ref int oldLine, ref int newLine, out string label)
     {
-        oldLine = null;
-        newLine = null;
-        
-        // Example: @@ -1,4 +1,5 @@
-        var parts = header.Split(' ');
-        if (parts.Length >= 3)
+        // Everything between the first and second "@@" is the range body;
+        // whatever follows the second one is the enclosing-context hint.
+        var bodyStart = 2;
+        var bodyEnd = header.IndexOf("@@", bodyStart, StringComparison.Ordinal);
+        var body = bodyEnd < 0 ? header.Substring(bodyStart) : header.Substring(bodyStart, bodyEnd - bodyStart);
+        var trailingContext = bodyEnd < 0 ? string.Empty : header.Substring(bodyEnd + 2).Trim();
+
+        var parts = body.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
         {
-            var oldPart = parts[1].TrimStart('-'); // "1,4" or "1"
-            var newPart = parts[2].TrimStart('+'); // "1,5" or "1"
+            if (part.Length < 2) continue;
+            var start = part.Substring(1).Split(',')[0];
+            if (!int.TryParse(start, out var value)) continue;
 
-            var oldStart = oldPart.Split(',')[0];
-            var newStart = newPart.Split(',')[0];
-
-            if (int.TryParse(oldStart, out var o)) oldLine = o;
-            if (int.TryParse(newStart, out var n)) newLine = n;
+            if (part[0] == '-') oldLine = value;
+            else if (part[0] == '+') newLine = value;
         }
+
+        var builder = new StringBuilder("Line ").Append(newLine);
+        if (trailingContext.Length > 0) builder.Append(" · ").Append(trailingContext);
+        label = builder.ToString();
+    }
+
+    /// <summary>
+    /// Builds an all-additions diff for an untracked file, whose content git
+    /// won't produce a diff for.
+    /// </summary>
+    public FileDiff SyntheticAllAdditions(string filePath, string content)
+    {
+        var contentLines = content.Split('\n');
+        var lines = new List<DiffLine>(contentLines.Length + 1)
+        {
+            HunkHeader("Line 1")
+        };
+
+        for (int i = 0; i < contentLines.Length; i++)
+        {
+            lines.Add(new DiffLine(contentLines[i].TrimEnd('\r'), DiffLineType.Addition, null, i + 1));
+        }
+
+        return new FileDiff(filePath, lines);
     }
 }

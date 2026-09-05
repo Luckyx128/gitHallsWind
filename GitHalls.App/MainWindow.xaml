@@ -14,30 +14,36 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="32" /> <!-- Custom Title Bar Space -->
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        
+
         <!-- Drag region for the Window -->
         <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent" IsHitTestVisible="True">
-            <TextBlock Text="GitHalls" VerticalAlignment="Center" Margin="16,0,0,0" FontSize="12" />
+            <TextBlock x:Name="TitleBarText" Text="GitHalls" VerticalAlignment="Center" Margin="16,0,0,0" FontSize="12" />
         </Grid>
 
         <MenuBar Grid.Row="1">
             <MenuBarItem Title="File">
+                <MenuFlyoutItem Text="Open Repository..." Click="OpenRepo_Click" />
                 <MenuFlyoutItem Text="Clone Repository..." Icon="Copy" Click="CloneRepo_Click" />
-                <MenuFlyoutItem Text="Settings..." Icon="Setting" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Exit" />
+                <MenuFlyoutItem Text="Exit" Click="Exit_Click" />
             </MenuBarItem>
             <MenuBarItem Title="Branch">
                 <MenuFlyoutItem Text="Merge into Current..." Click="MergeBranch_Click" />
             </MenuBarItem>
             <MenuBarItem Title="View">
                 <MenuFlyoutItem Text="Refresh" Icon="Refresh" Command="{x:Bind ViewModel.RefreshCommand}" />
+                <MenuFlyoutItem Text="Fetch" Icon="Sync" Command="{x:Bind ViewModel.FetchCommand}" />
             </MenuBarItem>
         </MenuBar>
 
-        <Grid Grid.Row="2">
+        <InfoBar Grid.Row="2" Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                 CloseButtonClick="ErrorBar_CloseButtonClick" />
+
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300" />
                 <ColumnDefinition Width="*" />
@@ -49,7 +55,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                
+
                 <SelectorBar x:Name="MainSelectorBar" SelectionChanged="MainSelectorBar_SelectionChanged" Margin="0,8,0,0" HorizontalAlignment="Center">
                     <SelectorBarItem x:Name="ChangesTab" Text="Changes" />
                     <SelectorBarItem x:Name="HistoryTab" Text="History" />
@@ -64,34 +70,43 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                
-                <!-- Toolbar directly above Diff -->
+
                 <CommandBar Grid.Row="0" DefaultLabelPosition="Right" Background="Transparent">
                     <CommandBar.Content>
                         <StackPanel Orientation="Horizontal" Spacing="12" Margin="12,10,0,0">
-                            <!-- Repo switcher placeholder -->
                             <DropDownButton Content="Repository">
                                 <DropDownButton.Flyout>
-                                    <MenuFlyout>
+                                    <MenuFlyout x:Name="RepositoryFlyout" Opening="RepositoryFlyout_Opening">
                                         <MenuFlyoutItem Text="Open Repository..." Click="OpenRepo_Click" />
                                         <MenuFlyoutItem Text="Clone Repository..." Click="CloneRepo_Click" />
+                                        <MenuFlyoutSeparator x:Name="RecentSeparator" Visibility="Collapsed" />
                                     </MenuFlyout>
                                 </DropDownButton.Flyout>
                             </DropDownButton>
 
-                            <!-- Branch Switcher -->
-                            <ComboBox ItemsSource="{x:Bind ViewModel.Branches, Mode=OneWay}" 
+                            <ComboBox x:Name="BranchSelector"
+                                      ItemsSource="{x:Bind ViewModel.Branches, Mode=OneWay}"
                                       SelectedItem="{x:Bind ViewModel.CurrentBranch, Mode=OneWay}"
                                       DisplayMemberPath="Name"
                                       Width="220"
                                       PlaceholderText="Select Branch..."
                                       SelectionChanged="BranchSelector_SelectionChanged" />
+
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Width="18" Height="18" />
                         </StackPanel>
                     </CommandBar.Content>
 
                     <AppBarButton Icon="Refresh" Label="Refresh" Command="{x:Bind ViewModel.RefreshCommand}" />
+                    <AppBarButton Icon="Sync" Label="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
                     <AppBarButton Icon="Shuffle" Label="Merge" Click="MergeBranch_Click" />
-                    <AppBarButton Icon="Comment" Label="Create PR" />
+                    <AppBarButton Icon="More" Label="Actions">
+                        <AppBarButton.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Reveal in File Explorer" Click="RevealInExplorer_Click" />
+                                <MenuFlyoutItem Text="Open in Terminal" Click="OpenTerminal_Click" />
+                            </MenuFlyout>
+                        </AppBarButton.Flyout>
+                    </AppBarButton>
                 </CommandBar>
 
                 <Frame x:Name="ContentFrame" Grid.Row="1" />

@@ -20,7 +20,7 @@ public class GitProcessResult
 
 public interface IGitProcessRunner
 {
-    Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string stdinData = null, CancellationToken cancellationToken = default);
+    Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string? stdinData = null, CancellationToken cancellationToken = default);
 }
 
 public class GitProcessRunner : IGitProcessRunner
@@ -41,7 +41,7 @@ public class GitProcessRunner : IGitProcessRunner
         return "git.exe";
     }
 
-    public async Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string stdinData = null, CancellationToken cancellationToken = default)
+    public async Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string? stdinData = null, CancellationToken cancellationToken = default)
     {
         var argsList = new List<string>
         {

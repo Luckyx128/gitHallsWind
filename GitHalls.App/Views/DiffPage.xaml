@@ -2,14 +2,8 @@
     x:Class="GitHalls.App.Views.DiffPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:models="using:GitHalls.Core.Models"
-    xmlns:converters="using:GitHalls.App.Converters"
-    xmlns:views="using:GitHalls.App.Views"
+    xmlns:controls="using:GitHalls.App.Controls"
     Background="Transparent">
-
-    <Page.Resources>
-        <converters:DiffLineColorConverter x:Key="DiffColorConverter" />
-    </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -17,53 +11,25 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Border Grid.Row="0" Padding="16,12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Padding="16,12"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" Spacing="16">
-                <TextBlock Text="{x:Bind FilePath, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" />
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="{x:Bind HasStats, Mode=OneWay}">
-                    <TextBlock Text="{x:Bind AdditionsText, Mode=OneWay}" Foreground="#4CAF50" FontWeight="Bold" FontSize="13" />
-                    <TextBlock Text="{x:Bind DeletionsText, Mode=OneWay}" Foreground="#F44336" FontWeight="Bold" FontSize="13" />
+                <TextBlock x:Name="FilePathText" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+                <StackPanel x:Name="StatsPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed">
+                    <TextBlock x:Name="AdditionsText" Foreground="#4CAF50" FontWeight="Bold" FontSize="13" />
+                    <TextBlock x:Name="DeletionsText" Foreground="#F44336" FontWeight="Bold" FontSize="13" />
                 </StackPanel>
             </StackPanel>
         </Border>
 
-        <!-- Diff Content -->
-        <ScrollViewer Grid.Row="1" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-            <ListView ItemsSource="{x:Bind DiffLines, Mode=OneWay}"
-                      SelectionMode="None"
-                      FontFamily="Consolas"
-                      FontSize="13">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="MinHeight" Value="22"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                    </Style>
-                </ListView.ItemContainerStyle>
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:DiffLine">
-                        <Grid Background="{x:Bind Type, Converter={StaticResource DiffColorConverter}, ConverterParameter='Background'}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="32" />
-                                <ColumnDefinition Width="50" />
-                                <ColumnDefinition Width="50" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+        <controls:DiffTextView x:Name="DiffView" Grid.Row="1" />
 
-                            <CheckBox Grid.Column="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
-                                      Visibility="{x:Bind views:DiffPage.GetVisibility(IsChangeLine)}" 
-                                      MinWidth="0" Margin="8,0,0,0" Padding="0" VerticalAlignment="Center" />
-
-                            <TextBlock Grid.Column="1" Text="{x:Bind OldLineNumber}" Foreground="Gray" TextAlignment="Right" Margin="0,0,12,0" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{x:Bind NewLineNumber}" Foreground="Gray" TextAlignment="Right" Margin="0,0,16,0" VerticalAlignment="Center" />
-                            
-                            <TextBlock Grid.Column="3" Text="{x:Bind Content}" TextWrapping="NoWrap" VerticalAlignment="Center"
-                                       Foreground="{x:Bind Type, Converter={StaticResource DiffColorConverter}, ConverterParameter='Foreground'}" />
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </ScrollViewer>
+        <TextBlock x:Name="EmptyText" Grid.Row="1"
+                   Text="Select a file to see its changes."
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     </Grid>
 </Page>

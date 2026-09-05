@@ -1,13 +1,21 @@
-using Microsoft.UI.Xaml;
+using GitHalls.App.Services;
 using GitHalls.App.ViewModels;
-using GitHalls.Core.Git;
 using GitHalls.App.Views;
+using GitHalls.Core.Git;
+using GitHalls.Core.Models;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace GitHalls.App;
 
 public sealed partial class MainWindow : Window
 {
+    private readonly GitService _gitService = new();
+    private readonly PlatformActions _platformActions = new();
+
+    /// <summary>Guards <see cref="BranchSelector_SelectionChanged"/> against selection changes we caused ourselves.</summary>
+    private bool _suppressBranchSelection;
+
     public RepositoryViewModel ViewModel { get; }
 
     public MainWindow()
@@ -15,24 +23,31 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         SetTitleBar(AppTitleBar);
 
-        // Normally provided by DI in App.xaml.cs, we will keep it simple here.
-        ViewModel = new RepositoryViewModel(new GitService());
+        ViewModel = new RepositoryViewModel(_gitService, new SettingsStore());
 
-        // When the window is activated, we trigger a refresh (fetch on focus equivalent)
-        this.Activated += MainWindow_Activated;
+        Activated += MainWindow_Activated;
+        Closed += (_, _) => ViewModel.Dispose();
 
-        // Default navigation
         MainSelectorBar.SelectedItem = ChangesTab;
-        
+
+        // Navigate up front so the diff pane shows its empty state instead of a
+        // blank frame until the first file is selected.
+        ContentFrame.Navigate(typeof(DiffPage));
+        (ContentFrame.Content as DiffPage)?.UpdateDiff(null);
+
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+
+        _ = ViewModel.InitializeAsync();
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
-        if (args.WindowActivationState != WindowActivationState.Deactivated)
-        {
-            _ = ViewModel.RefreshAsync();
-        }
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+
+        // Same behaviour as the Swift app on didBecomeActive: pick up what
+        // happened outside the app, including on the remote. Rate-limited
+        // inside the view model so alt-tabbing doesn't hit the network.
+        _ = ViewModel.FetchOnActivationAsync();
     }
 
     private void MainSelectorBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
@@ -48,17 +63,50 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // MARK: - Repository
+
+    private void RepositoryFlyout_Opening(object? sender, object e)
+    {
+        // Drop the previously listed recents, keeping the two fixed entries and
+        // the separator.
+        var fixedItemCount = 3;
+        while (RepositoryFlyout.Items.Count > fixedItemCount)
+        {
+            RepositoryFlyout.Items.RemoveAt(RepositoryFlyout.Items.Count - 1);
+        }
+
+        var recents = ViewModel.RecentRepositories.Where(p => p != ViewModel.RepositoryPath).ToList();
+        RecentSeparator.Visibility = recents.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        foreach (var path in recents)
+        {
+            var item = new MenuFlyoutItem { Text = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) };
+            ToolTipService.SetToolTip(item, path);
+            item.Click += (_, _) => ViewModel.RepositoryPath = path;
+            RepositoryFlyout.Items.Add(item);
+        }
+    }
+
+    private async void OpenRepo_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = await _platformActions.PickFolderAsync(this);
+        if (folder != null) ViewModel.RepositoryPath = folder;
+    }
+
     private async void CloneRepo_Click(object sender, RoutedEventArgs e)
     {
         var urlTextBox = new TextBox { PlaceholderText = "https://github.com/user/repo.git", Width = 400 };
         var folderButton = new Button { Content = "Select Destination Folder..." };
-        var selectedFolderText = new TextBlock { Margin = new Thickness(0, 8, 0, 0), Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray) };
-        string destinationPath = null;
-
-        folderButton.Click += async (s, args) =>
+        var selectedFolderText = new TextBlock
         {
-            var platform = new GitHalls.App.Services.PlatformActions();
-            destinationPath = await platform.PickFolderAsync(this);
+            Margin = new Thickness(0, 8, 0, 0),
+            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
+        };
+        string? destinationPath = null;
+
+        folderButton.Click += async (_, _) =>
+        {
+            destinationPath = await _platformActions.PickFolderAsync(this);
             if (destinationPath != null) selectedFolderText.Text = destinationPath;
         };
 
@@ -74,44 +122,32 @@ public sealed partial class MainWindow : Window
             Content = panel,
             PrimaryButtonText = "Clone",
             CloseButtonText = "Cancel",
-            XamlRoot = this.Content.XamlRoot
+            XamlRoot = Content.XamlRoot
         };
 
         var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(urlTextBox.Text) && !string.IsNullOrEmpty(destinationPath))
+        if (result != ContentDialogResult.Primary) return;
+        if (string.IsNullOrWhiteSpace(urlTextBox.Text) || string.IsNullOrEmpty(destinationPath)) return;
+
+        ViewModel.IsBusy = true;
+        try
         {
-            ViewModel.IsBusy = true;
-            try
-            {
-                var gitService = new GitService();
-                await gitService.CloneAsync(destinationPath, urlTextBox.Text);
-                
-                // Get the repo name from the URL to open it
-                var repoName = urlTextBox.Text.Split('/').Last().Replace(".git", "");
-                var fullPath = System.IO.Path.Combine(destinationPath, repoName);
-                
-                ViewModel.RepositoryPath = fullPath;
-            }
-            catch (Exception ex)
-            {
-                ViewModel.ErrorMessage = ex.Message;
-            }
-            finally
-            {
-                ViewModel.IsBusy = false;
-            }
+            // CloneAsync returns the directory git actually created, so the app
+            // opens that instead of a path assembled from the URL.
+            var clonedPath = await _gitService.CloneAsync(destinationPath, urlTextBox.Text.Trim());
+            ViewModel.RepositoryPath = clonedPath;
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            ViewModel.IsBusy = false;
         }
     }
 
-    private async void OpenRepo_Click(object sender, RoutedEventArgs e)
-    {
-        var platform = new GitHalls.App.Services.PlatformActions();
-        var folder = await platform.PickFolderAsync(this);
-        if (folder != null)
-        {
-            ViewModel.RepositoryPath = folder;
-        }
-    }
+    // MARK: - Branches
 
     private async void MergeBranch_Click(object sender, RoutedEventArgs e)
     {
@@ -119,14 +155,20 @@ public sealed partial class MainWindow : Window
 
         var branchComboBox = new ComboBox
         {
-            ItemsSource = ViewModel.Branches,
+            ItemsSource = ViewModel.Branches.Where(b => b.Name != ViewModel.CurrentBranch.Name).ToList(),
             DisplayMemberPath = "Name",
             Width = 300,
             PlaceholderText = "Select branch to merge..."
         };
 
         var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(new TextBlock { Text = $"Merge into '{ViewModel.CurrentBranch.Name}':" });
+        panel.Children.Add(new TextBlock
+        {
+            // Named explicitly, like the Swift merge sheet: a merge changes the
+            // branch you are on, which is easy to forget in the moment.
+            Text = $"Merging into '{ViewModel.CurrentBranch.Name}' — that is the branch that will change.",
+            TextWrapping = TextWrapping.Wrap
+        });
         panel.Children.Add(branchComboBox);
 
         var dialog = new ContentDialog
@@ -135,57 +177,70 @@ public sealed partial class MainWindow : Window
             Content = panel,
             PrimaryButtonText = "Merge",
             CloseButtonText = "Cancel",
-            XamlRoot = this.Content.XamlRoot
+            XamlRoot = Content.XamlRoot
         };
 
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && branchComboBox.SelectedItem is GitHalls.Core.Models.Branch targetBranch)
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary && branchComboBox.SelectedItem is Branch targetBranch)
         {
-            ViewModel.IsBusy = true;
-            try
-            {
-                var gitService = new GitService();
-                await gitService.MergeAsync(ViewModel.RepositoryPath, targetBranch.Name);
-                await ViewModel.RefreshAsync();
-            }
-            catch (Exception ex)
-            {
-                ViewModel.ErrorMessage = $"Merge failed: {ex.Message}";
-            }
-            finally
-            {
-                ViewModel.IsBusy = false;
-            }
+            await ViewModel.MergeBranchAsync(targetBranch);
         }
     }
 
     private async void BranchSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (e.AddedItems.Count > 0 && e.AddedItems[0] is GitHalls.Core.Models.Branch branch)
+        // A refresh repopulating the list raises this event too; acting on it
+        // would check out a branch the user never picked.
+        if (_suppressBranchSelection || ViewModel.IsApplyingBranches) return;
+        if (e.AddedItems.Count == 0 || e.AddedItems[0] is not Branch branch) return;
+        if (branch.Name == ViewModel.CurrentBranch?.Name) return;
+
+        _suppressBranchSelection = true;
+        try
         {
-            if (branch != ViewModel.CurrentBranch)
-            {
-                await ViewModel.CheckoutBranchAsync(branch);
-            }
+            await ViewModel.CheckoutBranchAsync(branch);
+        }
+        finally
+        {
+            _suppressBranchSelection = false;
         }
     }
-    
+
+    // MARK: - Quick actions
+
+    private void RevealInExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(ViewModel.RepositoryPath)) _platformActions.RevealInExplorer(ViewModel.RepositoryPath);
+    }
+
+    private void OpenTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(ViewModel.RepositoryPath)) _platformActions.OpenTerminal(ViewModel.RepositoryPath);
+    }
+
+    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void ErrorBar_CloseButtonClick(InfoBar sender, object args) => ViewModel.ClearError();
+
+    // MARK: - Diff
+
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(RepositoryViewModel.CurrentDiff))
+        if (e.PropertyName == nameof(RepositoryViewModel.RepositoryPath))
         {
-            if (ContentFrame.Content is DiffPage diffPage)
-            {
-                diffPage.UpdateDiff(ViewModel.CurrentDiff);
-            }
-            else
-            {
-                ContentFrame.Navigate(typeof(DiffPage));
-                if (ContentFrame.Content is DiffPage newDiffPage)
-                {
-                    newDiffPage.UpdateDiff(ViewModel.CurrentDiff);
-                }
-            }
+            TitleBarText.Text = string.IsNullOrEmpty(ViewModel.RepositoryPath)
+                ? "GitHalls"
+                : $"GitHalls — {Path.GetFileName(ViewModel.RepositoryPath.TrimEnd(Path.DirectorySeparatorChar))}";
+            return;
         }
+
+        if (e.PropertyName != nameof(RepositoryViewModel.CurrentDiff)) return;
+
+        if (ContentFrame.Content is not DiffPage diffPage)
+        {
+            ContentFrame.Navigate(typeof(DiffPage));
+            diffPage = ContentFrame.Content as DiffPage ?? throw new InvalidOperationException("DiffPage failed to load.");
+        }
+
+        diffPage.UpdateDiff(ViewModel.CurrentDiff);
     }
 }

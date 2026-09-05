@@ -1,0 +1,61 @@
+<UserControl
+    x:Class="GitHalls.App.Controls.DiffTextView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Find bar. WinUI has no built-in equivalent of NSTextView's find bar. -->
+        <Border x:Name="FindBar" Grid.Row="0" Visibility="Collapsed" Padding="8,6"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource LayerFillColorDefaultBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBox x:Name="FindTextBox" Width="240" PlaceholderText="Find in diff"
+                         TextChanged="FindTextBox_TextChanged" KeyDown="FindTextBox_KeyDown" />
+                <Button Content="&#xE70E;" FontFamily="Segoe MDL2 Assets" Click="FindPrevious_Click" ToolTipService.ToolTip="Previous" />
+                <Button Content="&#xE70D;" FontFamily="Segoe MDL2 Assets" Click="FindNext_Click" ToolTipService.ToolTip="Next" />
+                <TextBlock x:Name="FindStatusText" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Click="CloseFind_Click" ToolTipService.ToolTip="Close" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer x:Name="Scroller" Grid.Row="1"
+                      HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+                      ZoomMode="Disabled"
+                      ViewChanged="Scroller_ViewChanged"
+                      SizeChanged="Scroller_SizeChanged">
+
+            <!-- Three overlapping layers, all sized to the full content.
+                 Order matters: tints behind, text above them, gutter on top so
+                 horizontally scrolled content passes underneath it. -->
+            <Grid x:Name="ContentHost" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Canvas x:Name="TintLayer" />
+
+                <RichTextBlock x:Name="TextLayer"
+                               IsTextSelectionEnabled="True"
+                               TextWrapping="NoWrap"
+                               IsTabStop="True"
+                               LineStackingStrategy="BlockLineHeight" />
+
+                <Canvas x:Name="GutterLayer" HorizontalAlignment="Left">
+                    <Canvas.RenderTransform>
+                        <TranslateTransform x:Name="GutterTransform" />
+                    </Canvas.RenderTransform>
+                </Canvas>
+            </Grid>
+        </ScrollViewer>
+
+        <Button x:Name="ShowRemainingButton" Grid.Row="2" Visibility="Collapsed"
+                HorizontalAlignment="Stretch" Margin="0,1,0,0" Click="ShowRemaining_Click" />
+    </Grid>
+</UserControl>

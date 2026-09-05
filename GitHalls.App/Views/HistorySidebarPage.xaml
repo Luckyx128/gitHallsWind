@@ -16,7 +16,7 @@
         <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
             <AppBarButton Icon="Download" Label="Pull" Command="{x:Bind ViewModel.PullCommand}" />
             <AppBarButton Icon="Upload" Label="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}" Command="{x:Bind ViewModel.PushCommand}" />
-            <AppBarButton Icon="Sync" Label="Fetch" Command="{x:Bind ViewModel.RefreshCommand}" />
+            <AppBarButton Icon="Sync" Label="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
         </CommandBar>
 
         <!-- List of Commits -->

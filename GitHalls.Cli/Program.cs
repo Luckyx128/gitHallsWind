@@ -1,7 +1,12 @@
+using GitHalls.Core.Diff;
 using GitHalls.Core.Git;
 
 namespace GitHalls.Cli;
 
+/// <summary>
+/// Console harness for the git layer. Parsing edge cases are far cheaper to
+/// catch here, against a real repository, than through the UI.
+/// </summary>
 class Program
 {
     static async Task Main(string[] args)
@@ -19,7 +24,8 @@ class Program
             foreach (var change in status)
             {
                 var orig = change.OriginalPath != null ? $" (was {change.OriginalPath})" : "";
-                Console.WriteLine($"[{change.IndexStatus},{change.WorkTreeStatus}] {change.Path}{orig}");
+                var language = SyntaxLanguage.ForPath(change.Path) ?? "-";
+                Console.WriteLine($"[{change.IndexStatus},{change.WorkTreeStatus}] {change.Path}{orig} <{language}>");
             }
             Console.WriteLine();
 
@@ -36,29 +42,25 @@ class Program
             foreach (var branch in branches)
             {
                 var mark = branch.IsCurrent ? "*" : " ";
-                Console.WriteLine($"{mark} {branch.Name} {(branch.IsRemote ? $"[Remote: {branch.RemoteName}]" : "")}");
+                var remote = branch.IsRemote ? $" [remote: {branch.RemoteName}]" : "";
+                Console.WriteLine($"{mark} {branch.Name}{remote}");
             }
             Console.WriteLine();
 
             if (status.Count > 0)
             {
                 Console.WriteLine("=== DIFF (First file) ===");
-                var firstChange = status.First();
-                var diff = await gitService.GetDiffAsync(repoPath, firstChange.Path, firstChange.IsStaged);
-                
-                if (diff.IsBinary)
+                var firstChange = status[0];
+                var diff = await gitService.GetDiffAsync(repoPath, firstChange);
+
+                Console.WriteLine($"Diff for {diff.FilePath} ({diff.Lines.Count} lines, +{diff.Additions} -{diff.Deletions}):");
+                foreach (var line in diff.Lines.Take(15))
                 {
-                    Console.WriteLine($"{firstChange.Path} is a binary file.");
+                    var old = line.OldLineNumber?.ToString() ?? "";
+                    var @new = line.NewLineNumber?.ToString() ?? "";
+                    Console.WriteLine($"{old,5} {@new,5} [{line.Type}] {line.Content}");
                 }
-                else
-                {
-                    Console.WriteLine($"Diff for {firstChange.Path} ({diff.Lines.Count} lines):");
-                    foreach (var line in diff.Lines.Take(15))
-                    {
-                        Console.WriteLine($"[{line.Type}] {line.Content}");
-                    }
-                    if (diff.Lines.Count > 15) Console.WriteLine("...");
-                }
+                if (diff.Lines.Count > 15) Console.WriteLine("...");
             }
             else
             {

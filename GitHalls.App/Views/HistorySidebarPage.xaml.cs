@@ -6,7 +6,7 @@ namespace GitHalls.App.Views;
 
 public sealed partial class HistorySidebarPage : Page
 {
-    public RepositoryViewModel ViewModel { get; private set; }
+    public RepositoryViewModel ViewModel { get; private set; } = null!;
 
     public HistorySidebarPage()
     {
@@ -19,6 +19,11 @@ public sealed partial class HistorySidebarPage : Page
         {
             ViewModel = vm;
             DataContext = ViewModel;
+
+            // x:Bind resolved ViewModel once, during InitializeComponent, when it
+            // was still null — and a Page raises no change notification for its
+            // own properties. Without this the bound lists stay empty.
+            Bindings.Update();
         }
     }
 }

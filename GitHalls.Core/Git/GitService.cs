@@ -5,13 +5,16 @@ namespace GitHalls.Core.Git;
 
 public class GitService
 {
+    /// <summary>Bytes inspected when deciding whether an untracked file is binary.</summary>
+    private const int BinarySniffLength = 8192;
+
     private readonly IGitProcessRunner _runner;
     private readonly StatusParser _statusParser;
     private readonly DiffParser _diffParser;
     private readonly CommitLogParser _logParser;
     private readonly BranchParser _branchParser;
 
-    public GitService(IGitProcessRunner runner = null)
+    public GitService(IGitProcessRunner? runner = null)
     {
         _runner = runner ?? new GitProcessRunner();
         _statusParser = new StatusParser();
@@ -26,45 +29,57 @@ public class GitService
         return _statusParser.Parse(result.StandardOutput);
     }
 
-    public async Task<FileDiff> GetDiffAsync(string repoPath, string filePath, bool staged, bool isUntracked = false, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Diff of <paramref name="change"/> against HEAD. Deliberately not split
+    /// into staged/unstaged: a partially staged file would then show only half
+    /// of what actually changed on disk.
+    /// </summary>
+    public async Task<FileDiff> GetDiffAsync(string repoPath, FileChange change, CancellationToken cancellationToken = default)
     {
-        if (isUntracked)
+        if (change.IndexStatus == FileChangeStatus.Untracked)
         {
-            var fullPath = Path.Combine(repoPath, filePath);
-            if (!File.Exists(fullPath)) return new FileDiff(filePath, Array.Empty<DiffLine>());
+            // git produces no diff for a file it doesn't track yet, so the
+            // whole content is synthesized as additions.
+            var fullPath = Path.Combine(repoPath, change.Path);
+            if (!File.Exists(fullPath)) return new FileDiff(change.Path, Array.Empty<DiffLine>());
 
-            var lines = new List<DiffLine>
+            if (await IsBinaryFileAsync(fullPath, cancellationToken))
             {
-                new DiffLine($"diff --git a/{filePath} b/{filePath}", DiffLineType.Header, null, null),
-                new DiffLine($"--- /dev/null", DiffLineType.Header, null, null),
-                new DiffLine($"+++ b/{filePath}", DiffLineType.Header, null, null)
-            };
-
-            var contentLines = await File.ReadAllLinesAsync(fullPath, cancellationToken);
-            lines.Add(new DiffLine($"@@ -0,0 +1,{contentLines.Length} @@", DiffLineType.Header, null, null));
-
-            for (int i = 0; i < contentLines.Length; i++)
-            {
-                lines.Add(new DiffLine($"+{contentLines[i]}", DiffLineType.Addition, null, i + 1));
+                return new FileDiff(change.Path, new[]
+                {
+                    new DiffLine(DiffParser.BinaryFileText, DiffLineType.HunkHeader, null, null)
+                }, isBinary: true);
             }
 
-            return new FileDiff(filePath, lines);
+            var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
+            return _diffParser.SyntheticAllAdditions(change.Path, content);
         }
 
-        var args = new List<string> { "diff", "--unified=3" };
-        if (staged) args.Add("--cached");
-        args.Add("--");
-        args.Add(filePath);
+        var result = await _runner.RunAsync(
+            repoPath,
+            new[] { "diff", "--no-color", "--unified=3", "HEAD", "--", change.Path },
+            cancellationToken: cancellationToken);
 
-        var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
-        return _diffParser.Parse(filePath, result.StandardOutput);
+        return _diffParser.Parse(change.Path, result.StandardOutput);
+    }
+
+    /// <summary>
+    /// True when the first <see cref="BinarySniffLength"/> bytes contain a NUL —
+    /// the same cheap heuristic git itself uses.
+    /// </summary>
+    private static async Task<bool> IsBinaryFileAsync(string fullPath, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(fullPath);
+        var buffer = new byte[BinarySniffLength];
+        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+        return Array.IndexOf(buffer, (byte)0, 0, read) >= 0;
     }
 
     public async Task<IReadOnlyList<Commit>> GetLogAsync(string repoPath, int maxCount = 50, CancellationToken cancellationToken = default)
     {
         var format = "%H%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
         var args = new[] { "log", $"-n {maxCount}", $"--pretty=format:{format}" };
-        
+
         var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
         return _logParser.Parse(result.StandardOutput);
     }
@@ -90,14 +105,51 @@ public class GitService
         await _runner.RunAsync(repoPath, new[] { "commit", "-m", message }, cancellationToken: cancellationToken);
     }
 
-    public async Task DiscardAsync(string repoPath, string filePath, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Undoes a change. Which git commands that takes depends entirely on the
+    /// file's status: "restore" alone only ever handles a modified file.
+    /// </summary>
+    public async Task DiscardAsync(string repoPath, FileChange change, CancellationToken cancellationToken = default)
     {
-        await _runner.RunAsync(repoPath, new[] { "restore", "--", filePath }, cancellationToken: cancellationToken);
+        var path = change.Path;
+
+        switch (change.IndexStatus)
+        {
+            case FileChangeStatus.Untracked:
+                await _runner.RunAsync(repoPath, new[] { "clean", "-f", "--", path }, cancellationToken: cancellationToken);
+                break;
+
+            case FileChangeStatus.Added:
+                await _runner.RunAsync(repoPath, new[] { "reset", "HEAD", "--", path }, cancellationToken: cancellationToken);
+                await _runner.RunAsync(repoPath, new[] { "clean", "-f", "--", path }, cancellationToken: cancellationToken);
+                break;
+
+            case FileChangeStatus.Renamed:
+            case FileChangeStatus.Copied:
+                await _runner.RunAsync(repoPath, new[] { "reset", "HEAD", "--", path }, cancellationToken: cancellationToken);
+                await _runner.RunAsync(repoPath, new[] { "clean", "-f", "--", path }, cancellationToken: cancellationToken);
+                if (!string.IsNullOrEmpty(change.OriginalPath))
+                {
+                    // The rename left the original missing from the worktree —
+                    // bring it back, otherwise "discard" silently deletes a file.
+                    await _runner.RunAsync(repoPath, new[] { "checkout", "HEAD", "--", change.OriginalPath }, cancellationToken: cancellationToken);
+                }
+                break;
+
+            default:
+                await _runner.RunAsync(repoPath, new[] { "checkout", "HEAD", "--", path }, cancellationToken: cancellationToken);
+                break;
+        }
     }
 
     public async Task CheckoutAsync(string repoPath, string branchName, CancellationToken cancellationToken = default)
     {
         await _runner.RunAsync(repoPath, new[] { "checkout", branchName }, cancellationToken: cancellationToken);
+    }
+
+    public async Task FetchAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "fetch" }, cancellationToken: cancellationToken);
     }
 
     public async Task PushAsync(string repoPath, CancellationToken cancellationToken = default)
@@ -115,9 +167,43 @@ public class GitService
         await _runner.RunAsync(repoPath, new[] { "pull" }, cancellationToken: cancellationToken);
     }
 
-    public async Task CloneAsync(string targetDirectory, string remoteUrl, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Clones into <paramref name="parentDirectory"/>/&lt;repository name&gt; and
+    /// returns that path, so the caller opens the directory git actually created.
+    /// </summary>
+    public async Task<string> CloneAsync(string parentDirectory, string remoteUrl, CancellationToken cancellationToken = default)
     {
-        await _runner.RunAsync(targetDirectory, new[] { "clone", remoteUrl, "." }, cancellationToken: cancellationToken);
+        var name = RepositoryNameFromCloneUrl(remoteUrl);
+        var destination = Path.Combine(parentDirectory, name);
+
+        Directory.CreateDirectory(parentDirectory);
+        await _runner.RunAsync(parentDirectory, new[] { "clone", remoteUrl, destination }, cancellationToken: cancellationToken);
+
+        return destination;
+    }
+
+    /// <summary>
+    /// Directory name git would pick for a clone URL. Handles trailing slashes,
+    /// the ".git" suffix, and the "git@host:owner/repo.git" scp-like form,
+    /// whose last separator is ':' rather than '/'.
+    /// </summary>
+    public static string RepositoryNameFromCloneUrl(string remoteUrl)
+    {
+        var name = (remoteUrl ?? string.Empty).Trim();
+        name = name.TrimEnd('/', '\\');
+
+        if (name.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+        {
+            name = name.Substring(0, name.Length - 4);
+        }
+
+        var separator = name.LastIndexOfAny(new[] { '/', '\\', ':' });
+        if (separator >= 0 && separator < name.Length - 1)
+        {
+            name = name.Substring(separator + 1);
+        }
+
+        return name;
     }
 
     public async Task<bool> HasUpstreamAsync(string repoPath, string branchName, CancellationToken cancellationToken = default)
