@@ -6,44 +6,129 @@ namespace GitHalls.Core.Tests.Commits;
 
 public class ConventionalCommitSuggesterTests
 {
-    private readonly ConventionalCommitSuggester _suggester = new();
+    private static FileChange Staged(string path, FileChangeStatus status = FileChangeStatus.Modified)
+        => new(path, status, FileChangeStatus.Unknown);
 
     [Fact]
     public void SuggestType_NoChanges_ReturnsChore()
     {
-        var result = _suggester.SuggestType(Array.Empty<FileChange>());
-        Assert.Equal("chore", result);
+        Assert.Same(ConventionalCommitType.Chore, ConventionalCommitSuggester.SuggestType(Array.Empty<FileChange>()));
+    }
+
+    [Theory]
+    [InlineData("GitHalls.Core.Tests/Git/Parsers/DiffParserTests.cs")]
+    [InlineData("tests/helpers.py")]
+    [InlineData("src/app.spec.ts")]
+    public void SuggestType_OnlyTests_ReturnsTest(string path)
+    {
+        Assert.Same(ConventionalCommitType.Test, ConventionalCommitSuggester.SuggestType(new[] { Staged(path) }));
     }
 
     [Fact]
-    public void SuggestType_GitHubWorkflow_ReturnsCi()
+    public void SuggestType_TestPlusSource_IsNotTest()
     {
-        var changes = new[] { new FileChange(".github/workflows/build.yml", FileChangeStatus.Modified, FileChangeStatus.Unknown) };
-        var result = _suggester.SuggestType(changes);
-        Assert.Equal("ci", result);
+        // Every rule is "all files agree" — a commit that also changes source is
+        // not a test commit.
+        var changes = new[] { Staged("GitHalls.Core.Tests/SomeTests.cs"), Staged("GitHalls.Core/Git/GitService.cs") };
+        Assert.NotSame(ConventionalCommitType.Test, ConventionalCommitSuggester.SuggestType(changes));
     }
 
     [Fact]
-    public void SuggestType_MarkdownFile_ReturnsDocs()
+    public void SuggestType_OnlyMarkdown_ReturnsDocs()
     {
-        var changes = new[] { new FileChange("README.md", FileChangeStatus.Modified, FileChangeStatus.Unknown) };
-        var result = _suggester.SuggestType(changes);
-        Assert.Equal("docs", result);
+        Assert.Same(ConventionalCommitType.Docs, ConventionalCommitSuggester.SuggestType(new[] { Staged("README.md") }));
     }
 
     [Fact]
-    public void SuggestType_CsprojFile_ReturnsBuild()
+    public void SuggestType_Workflow_ReturnsCi()
     {
-        var changes = new[] { new FileChange("GitHalls.Core/GitHalls.Core.csproj", FileChangeStatus.Modified, FileChangeStatus.Unknown) };
-        var result = _suggester.SuggestType(changes);
-        Assert.Equal("build", result);
+        Assert.Same(ConventionalCommitType.Ci, ConventionalCommitSuggester.SuggestType(new[] { Staged(".github/workflows/build.yml") }));
     }
 
     [Fact]
-    public void SuggestType_TestFile_ReturnsTest()
+    public void SuggestType_ProjectFile_ReturnsBuild()
     {
-        var changes = new[] { new FileChange("GitHalls.Core.Tests/SomeTest.cs", FileChangeStatus.Modified, FileChangeStatus.Unknown) };
-        var result = _suggester.SuggestType(changes);
-        Assert.Equal("test", result);
+        Assert.Same(ConventionalCommitType.Build, ConventionalCommitSuggester.SuggestType(new[] { Staged("GitHalls.Core/GitHalls.Core.csproj") }));
+    }
+
+    [Fact]
+    public void SuggestType_AllAdded_ReturnsFeat()
+    {
+        var changes = new[] { Staged("src/Feature.cs", FileChangeStatus.Added), Staged("src/Other.cs", FileChangeStatus.Added) };
+        Assert.Same(ConventionalCommitType.Feat, ConventionalCommitSuggester.SuggestType(changes));
+    }
+
+    [Fact]
+    public void SuggestType_AllDeleted_ReturnsChore()
+    {
+        Assert.Same(ConventionalCommitType.Chore,
+            ConventionalCommitSuggester.SuggestType(new[] { Staged("src/Old.cs", FileChangeStatus.Deleted) }));
+    }
+
+    [Fact]
+    public void SuggestType_AllRenamed_ReturnsRefactor()
+    {
+        Assert.Same(ConventionalCommitType.Refactor,
+            ConventionalCommitSuggester.SuggestType(new[] { Staged("src/New.cs", FileChangeStatus.Renamed) }));
+    }
+
+    [Fact]
+    public void SuggestType_MostlyAdditions_ReturnsFeat()
+    {
+        var changes = new[] { Staged("src/App.cs") };
+        var numstat = new Dictionary<string, ConventionalCommitSuggester.LineStats>
+        {
+            ["src/App.cs"] = new(40, 2)
+        };
+        Assert.Same(ConventionalCommitType.Feat, ConventionalCommitSuggester.SuggestType(changes, numstat));
+    }
+
+    [Fact]
+    public void SuggestType_LargeTwoWayEdit_ReturnsRefactor()
+    {
+        var changes = new[] { Staged("src/App.cs") };
+        var numstat = new Dictionary<string, ConventionalCommitSuggester.LineStats>
+        {
+            ["src/App.cs"] = new(30, 25)
+        };
+        Assert.Same(ConventionalCommitType.Refactor, ConventionalCommitSuggester.SuggestType(changes, numstat));
+    }
+
+    [Fact]
+    public void SuggestType_SmallTwoWayEdit_ReturnsFix()
+    {
+        var changes = new[] { Staged("src/App.cs") };
+        var numstat = new Dictionary<string, ConventionalCommitSuggester.LineStats>
+        {
+            ["src/App.cs"] = new(3, 2)
+        };
+        Assert.Same(ConventionalCommitType.Fix, ConventionalCommitSuggester.SuggestType(changes, numstat));
+    }
+
+    [Fact]
+    public void SuggestType_WithoutNumstat_FallsBackToChore()
+    {
+        // A modified file with no line counts available carries no signal.
+        Assert.Same(ConventionalCommitType.Chore, ConventionalCommitSuggester.SuggestType(new[] { Staged("src/App.cs") }));
+    }
+
+    [Fact]
+    public void SuggestScope_SingleTopLevelFolder_ReturnsIt()
+    {
+        var changes = new[] { Staged("GitHalls.App/MainWindow.xaml"), Staged("GitHalls.App/Views/DiffPage.xaml") };
+        Assert.Equal("githalls.app", ConventionalCommitSuggester.SuggestScope(changes));
+    }
+
+    [Fact]
+    public void SuggestScope_SpreadAcrossFolders_ReturnsNull()
+    {
+        var changes = new[] { Staged("GitHalls.App/MainWindow.xaml"), Staged("GitHalls.Core/Git/GitService.cs") };
+        Assert.Null(ConventionalCommitSuggester.SuggestScope(changes));
+    }
+
+    [Fact]
+    public void SuggestScope_NoChanges_ReturnsNull()
+    {
+        Assert.Null(ConventionalCommitSuggester.SuggestScope(Array.Empty<FileChange>()));
     }
 }

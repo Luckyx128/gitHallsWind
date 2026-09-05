@@ -5,6 +5,7 @@ using GitHalls.Core.Git;
 using GitHalls.Core.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 
 namespace GitHalls.App;
 
@@ -265,7 +266,24 @@ public sealed partial class MainWindow : Window
         if (!string.IsNullOrEmpty(ViewModel.RepositoryPath)) _platformActions.OpenTerminal(ViewModel.RepositoryPath);
     }
 
-    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+    // Shortcuts the removed MenuBar used to declare.
+    private void ToggleSidebarAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        ToggleSidebar_Click(sender, new RoutedEventArgs());
+    }
+
+    private void RefreshAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        ViewModel.RefreshCommand.Execute(null);
+    }
+
+    private void OpenRepoAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        OpenRepo_Click(sender, new RoutedEventArgs());
+    }
 
     /// <summary>Collapses the sidebar to zero width and back, remembering the width it had.</summary>
     private void ToggleSidebar_Click(object sender, RoutedEventArgs e)

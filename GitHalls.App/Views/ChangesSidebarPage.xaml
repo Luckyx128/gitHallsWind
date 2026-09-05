@@ -79,11 +79,52 @@
 
         <StackPanel Grid.Row="2" Padding="12" Spacing="8"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
-            <TextBox x:Name="CommitMessageTextBox"
-                     PlaceholderText="Commit message"
-                     AcceptsReturn="True" Height="80" TextWrapping="Wrap"
-                     Text="{x:Bind ViewModel.CommitMessage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <Button Content="Commit" HorizontalAlignment="Stretch"
+
+            <!-- Conventional Commits: the type and scope build the "type(scope): "
+                 prefix of the summary, so the text stays editable by hand. -->
+            <Grid ColumnSpacing="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ComboBox x:Name="CommitTypeComboBox" Grid.Column="0"
+                          PlaceholderText="type" HorizontalAlignment="Stretch" Height="32"
+                          SelectionChanged="CommitTypeComboBox_SelectionChanged" />
+
+                <TextBox x:Name="CommitScopeTextBox" Grid.Column="1"
+                         PlaceholderText="scope" Height="32"
+                         Text="{x:Bind ViewModel.CommitScope, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         LostFocus="CommitScope_Committed" KeyDown="CommitScope_KeyDown" />
+
+                <Button Grid.Column="2" Width="32" Height="32" Padding="0"
+                        Content="&#xE9CE;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                        ToolTipService.ToolTip="Conventional Commits reference">
+                    <Button.Flyout>
+                        <Flyout>
+                            <StackPanel x:Name="CommitTypeReference" Spacing="10" Width="300" />
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
+                <Button x:Name="SuggestButton" Grid.Column="3" Height="32"
+                        Content="Suggest" Click="SuggestButton_Click"
+                        IsEnabled="{x:Bind ViewModel.HasStagedChanges, Mode=OneWay}"
+                        ToolTipService.ToolTip="Guess the type and scope from the staged files" />
+            </Grid>
+
+            <TextBox x:Name="CommitSummaryTextBox"
+                     PlaceholderText="Summary"
+                     Text="{x:Bind ViewModel.CommitSummary, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBox x:Name="CommitDescriptionTextBox"
+                     PlaceholderText="Description (optional)"
+                     AcceptsReturn="True" Height="72" TextWrapping="Wrap"
+                     Text="{x:Bind ViewModel.CommitDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button x:Name="CommitButton" Content="Commit" HorizontalAlignment="Stretch"
                     Style="{StaticResource AccentButtonStyle}"
                     Command="{x:Bind ViewModel.CommitCommand}" />
         </StackPanel>

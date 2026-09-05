@@ -1,3 +1,4 @@
+using GitHalls.Core.Commits;
 using GitHalls.Core.Git.Parsers;
 using GitHalls.Core.Models;
 
@@ -75,6 +76,58 @@ public class GitService
         return Array.IndexOf(buffer, (byte)0, 0, read) >= 0;
     }
 
+    /// <summary>
+    /// Staged line counts per path, from <c>git diff --cached --numstat</c>.
+    /// Feeds the conventional-commit suggestion.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, ConventionalCommitSuggester.LineStats>> GetStagedNumstatAsync(
+        string repoPath, CancellationToken cancellationToken = default)
+    {
+        var result = await _runner.RunAsync(repoPath, new[] { "diff", "--cached", "--numstat" }, cancellationToken: cancellationToken);
+
+        var stats = new Dictionary<string, ConventionalCommitSuggester.LineStats>();
+        foreach (var line in result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split('\t');
+            // A binary file reports "-\t-\tpath" — no line counts, so skip it.
+            if (parts.Length != 3) continue;
+            if (!int.TryParse(parts[0], out var additions)) continue;
+            if (!int.TryParse(parts[1], out var deletions)) continue;
+
+            stats[parts[2].Trim()] = new ConventionalCommitSuggester.LineStats(additions, deletions);
+        }
+
+        return stats;
+    }
+
+    /// <summary>
+    /// How far the current branch is ahead of and behind its upstream, or null
+    /// when it has no upstream (a new branch that was never pushed).
+    ///
+    /// Reads the "# branch.ab +N -M" header of the v2 porcelain format, which
+    /// gives both counts in the same call that already reports the status.
+    /// </summary>
+    public async Task<(int Ahead, int Behind)?> GetBranchSyncAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        var result = await _runner.RunAsync(repoPath, new[] { "status", "--porcelain=v2", "--branch" }, cancellationToken: cancellationToken);
+
+        const string marker = "# branch.ab ";
+        foreach (var line in result.StandardOutput.Split('\n'))
+        {
+            if (!line.StartsWith(marker, StringComparison.Ordinal)) continue;
+
+            var parts = line.Substring(marker.Length).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2) continue;
+            if (!int.TryParse(parts[0], out var ahead)) continue;
+            if (!int.TryParse(parts[1], out var behind)) continue;
+
+            // git reports behind as a negative number.
+            return (ahead, Math.Abs(behind));
+        }
+
+        return null;
+    }
+
     public async Task<IReadOnlyList<Commit>> GetLogAsync(string repoPath, int maxCount = 50, CancellationToken cancellationToken = default)
     {
         var format = "%H%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
@@ -145,9 +198,20 @@ public class GitService
         await _runner.RunAsync(repoPath, new[] { "restore", "--staged", "--" }.Concat(paths), cancellationToken: cancellationToken);
     }
 
-    public async Task CommitAsync(string repoPath, string message, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Commits with a summary and an optional description, passed as two -m
+    /// arguments so git formats the blank line between them itself.
+    /// </summary>
+    public async Task CommitAsync(string repoPath, string summary, string? description = null, CancellationToken cancellationToken = default)
     {
-        await _runner.RunAsync(repoPath, new[] { "commit", "-m", message }, cancellationToken: cancellationToken);
+        var args = new List<string> { "commit", "-m", summary };
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            args.Add("-m");
+            args.Add(description);
+        }
+
+        await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -249,19 +313,6 @@ public class GitService
         }
 
         return name;
-    }
-
-    public async Task<bool> HasUpstreamAsync(string repoPath, string branchName, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var result = await _runner.RunAsync(repoPath, new[] { "rev-parse", "--abbrev-ref", branchName + "@{u}" }, cancellationToken: cancellationToken);
-            return !string.IsNullOrWhiteSpace(result.StandardOutput);
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     public async Task MergeAsync(string repoPath, string branchName, CancellationToken cancellationToken = default)

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GitHalls.App.Services;
+using GitHalls.Core.Commits;
 using GitHalls.Core.Git;
 using GitHalls.Core.Models;
 using Microsoft.UI.Dispatching;
@@ -81,12 +82,57 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private Branch? _currentBranch;
 
     [ObservableProperty]
-    private string _pushButtonLabel = "Push";
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanCommit))]
     [NotifyCanExecuteChangedFor(nameof(CommitCommand))]
-    private string _commitMessage = string.Empty;
+    private string _commitSummary = string.Empty;
+
+    [ObservableProperty]
+    private string _commitDescription = string.Empty;
+
+    [ObservableProperty]
+    private ConventionalCommitType? _commitType;
+
+    [ObservableProperty]
+    private string _commitScope = string.Empty;
+
+    /// <summary>Ahead/behind the upstream. Both zero and <see cref="HasUpstream"/> true means up to date.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
+    private int _syncAhead;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
+    private int _syncBehind;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
+    private bool _hasUpstream;
+
+    /// <summary>Label of the single sync button. Port of SyncButton.swift.</summary>
+    public string SyncTitle
+    {
+        get
+        {
+            if (!HasUpstream) return "Publish Branch";
+            if (SyncAhead > 0) return $"Push ({SyncAhead})";
+            if (SyncBehind > 0) return $"Pull ({SyncBehind})";
+            return "Up to date";
+        }
+    }
+
+    public string SyncGlyph
+    {
+        get
+        {
+            if (!HasUpstream || SyncAhead > 0) return "\uE898"; // Upload
+            if (SyncBehind > 0) return "\uE896";                // Download
+            return "\uE73E";                                    // Checkmark
+        }
+    }
+
+    /// <summary>Up to date is a state, not an action — the button says so and stays disabled.</summary>
+    public bool CanSync => !IsBusy && !string.IsNullOrEmpty(RepositoryPath)
+        && (!HasUpstream || SyncAhead > 0 || SyncBehind > 0);
 
     /// <summary>
     /// Tri-state for the "stage all" checkbox: true = everything staged,
@@ -106,8 +152,13 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     /// <summary>Committing needs both something staged and something to say about it.</summary>
     public bool CanCommit => !IsBusy
-        && !string.IsNullOrWhiteSpace(CommitMessage)
+        && !string.IsNullOrWhiteSpace(CommitSummary)
         && Changes.Any(c => c.IsStaged);
+
+    /// <summary>Staged files only — what the suggestion and the commit actually act on.</summary>
+    public IReadOnlyList<FileChange> StagedChanges => Changes.Where(c => c.IsStaged).ToList();
+
+    public bool HasStagedChanges => Changes.Any(c => c.IsStaged);
 
     public bool HasSelectedChange => SelectedChange != null;
 
@@ -174,7 +225,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(CanCommit));
+        OnPropertyChanged(nameof(CanSync));
         CommitCommand.NotifyCanExecuteChanged();
+        SyncCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedChangeChanged(FileChange? value)
@@ -352,11 +405,13 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         var branches = await _gitService.GetBranchesAsync(repoPath);
         MergeBranches(branches);
 
-        if (CurrentBranch != null)
-        {
-            bool hasUpstream = await _gitService.HasUpstreamAsync(repoPath, CurrentBranch.Name);
-            PushButtonLabel = hasUpstream ? "Push" : "Publish Branch";
-        }
+        // One call answers both "is there an upstream" and "how far apart are
+        // we", replacing a separate rev-parse per refresh.
+        var sync = await _gitService.GetBranchSyncAsync(repoPath);
+        HasUpstream = sync != null;
+        SyncAhead = sync?.Ahead ?? 0;
+        SyncBehind = sync?.Behind ?? 0;
+        SyncCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Replaces only what actually changed, so the list doesn't flicker.</summary>
@@ -403,6 +458,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         // All derived from the list, and none is recomputed on its own.
         OnPropertyChanged(nameof(StagedState));
         OnPropertyChanged(nameof(CanCommit));
+        OnPropertyChanged(nameof(StagedChanges));
+        OnPropertyChanged(nameof(HasStagedChanges));
         CommitCommand.NotifyCanExecuteChanged();
     }
 
@@ -495,11 +552,17 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     {
         if (!CanCommit) return;
 
-        var message = CommitMessage;
-        await RunGitAsync(path => _gitService.CommitAsync(path, message));
+        var summary = CommitSummary;
+        var description = CommitDescription;
+        await RunGitAsync(path => _gitService.CommitAsync(path, summary, description));
 
         // Keep the message on failure — it is the one thing the user typed by hand.
-        if (!HasError) CommitMessage = string.Empty;
+        if (HasError) return;
+
+        CommitSummary = string.Empty;
+        CommitDescription = string.Empty;
+        CommitType = null;
+        CommitScope = string.Empty;
     }
 
     /// <summary>
@@ -562,8 +625,71 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public async Task PushAsync()
     {
-        var publish = PushButtonLabel == "Publish Branch";
+        var publish = !HasUpstream;
         await RunGitAsync(path => publish ? _gitService.PushPublishAsync(path) : _gitService.PushAsync(path));
+    }
+
+    /// <summary>
+    /// The one action the sync button performs, chosen from the current state.
+    /// Push wins when the branch is both ahead and behind: pushing first is what
+    /// surfaces the conflict, rather than quietly merging into your work.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSync))]
+    public async Task SyncAsync()
+    {
+        if (!HasUpstream || SyncAhead > 0)
+        {
+            await PushAsync();
+        }
+        else if (SyncBehind > 0)
+        {
+            await PullAsync();
+        }
+    }
+
+    /// <summary>
+    /// Fills in the conventional-commit type and scope from what is staged.
+    /// Needs numstat, which only git can answer, hence async.
+    /// </summary>
+    public async Task SuggestCommitTypeAsync()
+    {
+        var repoPath = RepositoryPath;
+        var staged = StagedChanges;
+        if (staged.Count == 0) return;
+
+        IReadOnlyDictionary<string, ConventionalCommitSuggester.LineStats>? numstat = null;
+        if (!string.IsNullOrEmpty(repoPath))
+        {
+            try
+            {
+                numstat = await _gitService.GetStagedNumstatAsync(repoPath);
+            }
+            catch
+            {
+                // A suggestion is a convenience; fall back to the status-only rules.
+            }
+        }
+
+        CommitScope = ConventionalCommitSuggester.SuggestScope(staged) ?? string.Empty;
+        CommitType = ConventionalCommitSuggester.SuggestType(staged, numstat);
+    }
+
+    /// <summary>
+    /// Rewrites the "type(scope): " prefix of the summary, keeping whatever the
+    /// user already typed after it.
+    /// </summary>
+    public void ApplyConventionalPrefix()
+    {
+        if (CommitType == null) return;
+
+        var scope = CommitScope.Trim();
+        var scopePart = scope.Length == 0 ? string.Empty : $"({scope})";
+        var prefix = $"{CommitType.Name}{scopePart}: ";
+
+        var separator = CommitSummary.IndexOf(": ", StringComparison.Ordinal);
+        CommitSummary = separator >= 0
+            ? prefix + CommitSummary.Substring(separator + 2)
+            : prefix + CommitSummary;
     }
 
     [RelayCommand]

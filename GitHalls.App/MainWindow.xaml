@@ -11,13 +11,18 @@
     </Window.SystemBackdrop>
 
     <Grid>
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="B" Modifiers="Control" Invoked="ToggleSidebarAccelerator_Invoked" />
+            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RefreshAccelerator_Invoked" />
+            <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenRepoAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
+
         <Grid.Resources>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
         </Grid.Resources>
 
         <Grid.RowDefinitions>
             <RowDefinition Height="32" /> <!-- Custom Title Bar Space -->
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -27,41 +32,15 @@
             <TextBlock x:Name="TitleBarText" Text="GitHalls" VerticalAlignment="Center" Margin="16,0,0,0" FontSize="12" />
         </Grid>
 
-        <MenuBar Grid.Row="1">
-            <MenuBarItem Title="File">
-                <MenuFlyoutItem Text="Open Repository..." Click="OpenRepo_Click">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="O" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Clone Repository..." Icon="Copy" Click="CloneRepo_Click" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Exit" Click="Exit_Click" />
-            </MenuBarItem>
-            <MenuBarItem Title="Branch">
-                <MenuFlyoutItem Text="Merge into Current..." Click="MergeBranch_Click" />
-            </MenuBarItem>
-            <MenuBarItem Title="View">
-                <MenuFlyoutItem Text="Toggle Sidebar" Click="ToggleSidebar_Click">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="B" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Refresh" Icon="Refresh" Command="{x:Bind ViewModel.RefreshCommand}">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="R" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Fetch" Icon="Sync" Command="{x:Bind ViewModel.FetchCommand}" />
-            </MenuBarItem>
-        </MenuBar>
+        <!-- The MenuBar that used to sit here only duplicated the toolbar
+             (Open/Clone in the Repository button, Merge, Refresh, Fetch, Toggle
+             Sidebar). Its keyboard shortcuts are declared on the root Grid. -->
 
-        <InfoBar Grid.Row="2" Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+        <InfoBar Grid.Row="1" Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
                  Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                  CloseButtonClick="ErrorBar_CloseButtonClick" />
 
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <!-- min/max mirror the Swift navigationSplitViewColumnWidth(min:ideal:) -->
                 <ColumnDefinition x:Name="SidebarColumn" Width="280" MinWidth="220" MaxWidth="520" />
@@ -127,23 +106,31 @@
                                 </DropDownButton.Flyout>
                             </DropDownButton>
 
+                            <!-- One button whose label states what is actually needed:
+                                 Push (N) / Pull (N) / Publish Branch / Up to date.
+                                 Port of SyncButton.swift. -->
+                            <Button x:Name="SyncButton" Height="32" MinWidth="130"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    HorizontalContentAlignment="Left"
+                                    Command="{x:Bind ViewModel.SyncCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                              Glyph="{x:Bind ViewModel.SyncGlyph, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.SyncTitle, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Content="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                    Width="36" Height="32" Padding="0"
+                                    Command="{x:Bind ViewModel.FetchCommand}"
+                                    ToolTipService.ToolTip="Fetch from remote" />
+
                             <ProgressRing Width="18" Height="18"
                                           IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
                                           Visibility="{x:Bind ToVisibility(ViewModel.IsBusy), Mode=OneWay}" />
                         </StackPanel>
                     </CommandBar.Content>
 
-                    <!-- Sync lives here, not in the History sidebar: it acts on the
-                         repository as a whole, like the Swift toolbar SyncButton.
-                         Icon-only with tooltips, except Push — its label is the one
-                         that changes ("Publish Branch"), so it stays readable. -->
-                    <AppBarButton Icon="Sync" LabelPosition="Collapsed" ToolTipService.ToolTip="Fetch" Command="{x:Bind ViewModel.FetchCommand}" />
-                    <AppBarButton Icon="Download" LabelPosition="Collapsed" ToolTipService.ToolTip="Pull" Command="{x:Bind ViewModel.PullCommand}" />
-                    <AppBarButton Icon="Upload"
-                                  Label="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}"
-                                  ToolTipService.ToolTip="{x:Bind ViewModel.PushButtonLabel, Mode=OneWay}"
-                                  Command="{x:Bind ViewModel.PushCommand}" />
-                    <AppBarSeparator />
                     <AppBarButton Icon="Refresh" LabelPosition="Collapsed" ToolTipService.ToolTip="Refresh (Ctrl+R)" Command="{x:Bind ViewModel.RefreshCommand}" />
                     <AppBarButton Icon="Shuffle" LabelPosition="Collapsed" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
                     <AppBarButton Icon="More" LabelPosition="Collapsed" ToolTipService.ToolTip="Repository actions">
