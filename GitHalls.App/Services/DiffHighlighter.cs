@@ -1,5 +1,7 @@
 using ColorCode;
 using ColorCode.Common;
+using ColorCode.Parsing;
+using ColorCode.Styling;
 using GitHalls.App.Themes;
 
 namespace GitHalls.App.Services;
@@ -114,6 +116,25 @@ public sealed class ColorCodeDiffHighlighter : CodeColorizerBase, IDiffHighlight
         {
             Append(parsedSourceCode.Substring(offset), current);
         }
+    }
+
+    private void GetStyleInsertionsForCapturedStyle(Scope scope, ICollection<TextInsertion> styleInsertions)
+    {
+        styleInsertions.Add(new TextInsertion
+        {
+            Index = scope.Index,
+            Scope = scope
+        });
+
+        foreach (Scope childScope in scope.Children)
+        {
+            GetStyleInsertionsForCapturedStyle(childScope, styleInsertions);
+        }
+
+        styleInsertions.Add(new TextInsertion
+        {
+            Index = scope.Index + scope.Length
+        });
     }
 
     private void Append(string text, Scope? scope)
