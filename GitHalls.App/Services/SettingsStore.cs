@@ -7,6 +7,9 @@ public class AppSettings
 {
     public List<string> RecentRepositories { get; set; } = new();
     public string? LastOpenedRepository { get; set; }
+
+    /// <summary>Recently checked-out branches, keyed by repository path.</summary>
+    public Dictionary<string, List<string>> RecentBranches { get; set; } = new();
 }
 
 /// <summary>

@@ -2,6 +2,7 @@
     x:Class="GitHalls.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:GitHalls.App.Controls"
     xmlns:converters="using:GitHalls.App.Converters"
     xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     Title="GitHalls">
@@ -102,7 +103,16 @@
                                 <TextBlock x:Name="BranchButtonText" Text="Branch"
                                            TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 <DropDownButton.Flyout>
-                                    <MenuFlyout x:Name="BranchFlyout" Opening="BranchFlyout_Opening" Placement="Bottom" />
+                                    <Flyout x:Name="BranchFlyout" Placement="Bottom" Opening="BranchFlyout_Opening"
+                                            ShouldConstrainToRootBounds="False">
+                                        <Flyout.FlyoutPresenterStyle>
+                                            <Style TargetType="FlyoutPresenter">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="MaxWidth" Value="320" />
+                                            </Style>
+                                        </Flyout.FlyoutPresenterStyle>
+                                        <controls:BranchSwitcher x:Name="BranchSwitcherControl" />
+                                    </Flyout>
                                 </DropDownButton.Flyout>
                             </DropDownButton>
 

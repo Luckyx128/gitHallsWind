@@ -1,3 +1,4 @@
+using GitHalls.App.Controls;
 using GitHalls.App.Services;
 using GitHalls.App.ViewModels;
 using GitHalls.App.Views;
@@ -167,92 +168,46 @@ public sealed partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(ViewModel.RepositoryPath) || ViewModel.CurrentBranch == null) return;
 
-        var branchComboBox = new ComboBox
-        {
-            ItemsSource = ViewModel.Branches.Where(b => b.Name != ViewModel.CurrentBranch.Name).ToList(),
-            DisplayMemberPath = "Name",
-            Width = 300,
-            PlaceholderText = "Select branch to merge..."
-        };
-
-        var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(new TextBlock
-        {
-            // Named explicitly, like the Swift merge sheet: a merge changes the
-            // branch you are on, which is easy to forget in the moment.
-            Text = $"Merging into '{ViewModel.CurrentBranch.Name}' — that is the branch that will change.",
-            TextWrapping = TextWrapping.Wrap
-        });
-        panel.Children.Add(branchComboBox);
+        var sheet = new MergeSheet();
 
         var dialog = new ContentDialog
         {
-            Title = "Merge Branch",
-            Content = panel,
+            Title = $"Merge into \"{ViewModel.CurrentBranch.Name}\"",
+            Content = sheet,
             PrimaryButtonText = "Merge",
             CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            IsPrimaryButtonEnabled = false,
             XamlRoot = Content.XamlRoot
         };
 
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary && branchComboBox.SelectedItem is Branch targetBranch)
+        // Nothing to merge until a branch is picked.
+        sheet.SelectionValidChanged += (_, valid) => dialog.IsPrimaryButtonEnabled = valid;
+        sheet.Load(ViewModel);
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary && sheet.SelectedBranch is { } targetBranch)
         {
             await ViewModel.MergeBranchAsync(targetBranch);
         }
     }
 
     /// <summary>
-    /// Builds the branch list on open: local branches first, then remotes.
+    /// Hands the picker the current state each time it opens, and closes the
+    /// flyout as soon as it acts.
     ///
     /// This replaced a ComboBox, which had to be defended against its own
     /// SelectionChanged — repopulating the list on every refresh nulled and
     /// reassigned SelectedItem, which read as "the user picked a branch" and
-    /// fired a checkout. A menu has no selection state to clobber.
+    /// fired a checkout. A flyout has no selection state to clobber.
     /// </summary>
     private void BranchFlyout_Opening(object? sender, object e)
     {
-        BranchFlyout.Items.Clear();
-
-        var current = ViewModel.CurrentBranch?.Name;
-        var locals = ViewModel.Branches.Where(b => !b.IsRemote).ToList();
-        var remotes = ViewModel.Branches.Where(b => b.IsRemote).ToList();
-
-        if (locals.Count == 0 && remotes.Count == 0)
-        {
-            BranchFlyout.Items.Add(new MenuFlyoutItem { Text = "No branches", IsEnabled = false });
-            return;
-        }
-
-        foreach (var branch in locals)
-        {
-            BranchFlyout.Items.Add(BuildBranchItem(branch, isCurrent: branch.Name == current));
-        }
-
-        if (remotes.Count > 0)
-        {
-            if (locals.Count > 0) BranchFlyout.Items.Add(new MenuFlyoutSeparator());
-            foreach (var branch in remotes)
-            {
-                BranchFlyout.Items.Add(BuildBranchItem(branch, isCurrent: false));
-            }
-        }
+        BranchSwitcherControl.ActionCompleted -= BranchSwitcher_ActionCompleted;
+        BranchSwitcherControl.ActionCompleted += BranchSwitcher_ActionCompleted;
+        BranchSwitcherControl.Load(ViewModel);
     }
 
-    private MenuFlyoutItem BuildBranchItem(Branch branch, bool isCurrent)
-    {
-        var item = new MenuFlyoutItem
-        {
-            Text = branch.Name,
-            IsEnabled = !isCurrent
-        };
-
-        if (isCurrent)
-        {
-            item.Icon = new FontIcon { Glyph = "\uE73E" }; // checkmark
-        }
-
-        item.Click += async (_, _) => await ViewModel.CheckoutBranchAsync(branch);
-        return item;
-    }
+    private void BranchSwitcher_ActionCompleted(object? sender, EventArgs e) => BranchFlyout.Hide();
 
     // MARK: - Quick actions
 

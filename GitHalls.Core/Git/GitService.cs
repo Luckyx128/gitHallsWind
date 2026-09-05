@@ -256,6 +256,12 @@ public class GitService
         await _runner.RunAsync(repoPath, new[] { "checkout", branchName }, cancellationToken: cancellationToken);
     }
 
+    /// <summary>Creates a branch from the current HEAD and switches to it.</summary>
+    public async Task CreateBranchAsync(string repoPath, string branchName, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "checkout", "-b", branchName }, cancellationToken: cancellationToken);
+    }
+
     public async Task FetchAsync(string repoPath, CancellationToken cancellationToken = default)
     {
         await _runner.RunAsync(repoPath, new[] { "fetch" }, cancellationToken: cancellationToken);

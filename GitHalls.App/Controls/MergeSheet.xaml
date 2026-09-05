@@ -1,0 +1,40 @@
+<UserControl
+    x:Class="GitHalls.App.Controls.MergeSheet"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:GitHalls.App.Controls">
+
+    <Grid Width="380">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Which branch changes, stated before anything is picked. A merge
+             updates the branch you are on, and that is the easy thing to forget. -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10" VerticalAlignment="Center">
+            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    CornerRadius="6" Padding="10,4">
+                <TextBlock x:Name="SourceText" Text="Select a branch"
+                           TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="140" />
+            </Border>
+
+            <FontIcon Glyph="&#xE72A;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <Border Background="{ThemeResource AccentFillColorSelectedTextBackgroundBrush}"
+                    CornerRadius="6" Padding="10,4">
+                <TextBlock x:Name="TargetText" FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="140" />
+            </Border>
+        </StackPanel>
+
+        <Border Grid.Row="1" BorderThickness="1" CornerRadius="6"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+            <controls:BranchPicker x:Name="Picker" Height="260" />
+        </Border>
+
+        <InfoBar x:Name="WarningBar" Grid.Row="2" Severity="Warning"
+                 IsOpen="False" IsClosable="False" Margin="0,12,0,0" />
+    </Grid>
+</UserControl>

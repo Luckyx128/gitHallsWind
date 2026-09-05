@@ -51,6 +51,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     public ObservableCollection<Branch> Branches { get; } = new();
     public ObservableCollection<string> RecentRepositories { get; } = new();
 
+    /// <summary>Branches recently checked out in the current repository, most recent first.</summary>
+    public ObservableCollection<string> RecentBranchNames { get; } = new();
+
     [ObservableProperty]
     private FileChange? _selectedChange;
 
@@ -191,6 +194,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
             RecentRepositories.Add(normalized);
         }
 
+        _recentBranchesByRepo = settings.RecentBranches ?? new Dictionary<string, List<string>>();
+
         if (!string.IsNullOrEmpty(settings.LastOpenedRepository) && Directory.Exists(settings.LastOpenedRepository))
         {
             RepositoryPath = settings.LastOpenedRepository;
@@ -218,6 +223,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         }
 
         PromoteRecent(normalized);
+        LoadRecentBranches();
         StartAutoRefresh();
         _ = RefreshAsync();
     }
@@ -291,6 +297,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     }
 
     private const int MaxRecentRepositories = 10;
+    private const int MaxRecentBranches = 5;
+
+    /// <summary>Recent branches per repository, as loaded from settings.</summary>
+    private Dictionary<string, List<string>> _recentBranchesByRepo = new();
 
     /// <summary>
     /// Canonical form of a repository path, so the same repository is never
@@ -346,8 +356,33 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private void Save() => _ = _settingsStore.SaveAsync(new AppSettings
     {
         RecentRepositories = RecentRepositories.ToList(),
-        LastOpenedRepository = RepositoryPath
+        LastOpenedRepository = RepositoryPath,
+        RecentBranches = _recentBranchesByRepo
     });
+
+    private void LoadRecentBranches()
+    {
+        RecentBranchNames.Clear();
+        if (string.IsNullOrEmpty(RepositoryPath)) return;
+        if (!_recentBranchesByRepo.TryGetValue(RepositoryPath, out var names)) return;
+
+        foreach (var name in names) RecentBranchNames.Add(name);
+    }
+
+    private void PromoteRecentBranch(string branchName)
+    {
+        var repoPath = RepositoryPath;
+        if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(branchName)) return;
+
+        var names = _recentBranchesByRepo.TryGetValue(repoPath, out var existing) ? existing : new List<string>();
+        names.RemoveAll(n => string.Equals(n, branchName, StringComparison.Ordinal));
+        names.Insert(0, branchName);
+        if (names.Count > MaxRecentBranches) names.RemoveRange(MaxRecentBranches, names.Count - MaxRecentBranches);
+
+        _recentBranchesByRepo[repoPath] = names;
+        LoadRecentBranches();
+        Save();
+    }
 
     [RelayCommand]
     public async Task RefreshAsync()
@@ -584,10 +619,32 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         });
     }
 
+    /// <summary>
+    /// Switches branches. Uses <see cref="Branch.CheckoutName"/>, not the display
+    /// name: checking out "origin/main" literally would detach HEAD.
+    /// </summary>
     public async Task CheckoutBranchAsync(Branch branch)
     {
         if (branch == null) return;
-        await RunGitAsync(path => _gitService.CheckoutAsync(path, branch.Name));
+        await SwitchBranchAsync(branch.CheckoutName);
+    }
+
+    public async Task SwitchBranchAsync(string branchName)
+    {
+        if (string.IsNullOrWhiteSpace(branchName)) return;
+
+        await RunGitAsync(path => _gitService.CheckoutAsync(path, branchName));
+        if (!HasError) PromoteRecentBranch(branchName);
+    }
+
+    /// <summary>Creates a branch from the current HEAD and switches to it.</summary>
+    public async Task CreateBranchAsync(string branchName)
+    {
+        var trimmed = branchName?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0) return;
+
+        await RunGitAsync(path => _gitService.CreateBranchAsync(path, trimmed));
+        if (!HasError) PromoteRecentBranch(trimmed);
     }
 
     public async Task MergeBranchAsync(Branch branch)

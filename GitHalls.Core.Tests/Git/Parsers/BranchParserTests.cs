@@ -1,4 +1,5 @@
 using GitHalls.Core.Git.Parsers;
+using GitHalls.Core.Models;
 using Xunit;
 
 namespace GitHalls.Core.Tests.Git.Parsers;
@@ -67,5 +68,30 @@ public class BranchParserTests
 
         Assert.Equal("(HEAD detached at 1a2b3c4)", result[0].Name);
         Assert.True(result[0].IsCurrent);
+    }
+}
+
+public class BranchCheckoutNameTests
+{
+    [Fact]
+    public void CheckoutName_Local_IsTheNameItself()
+    {
+        Assert.Equal("main", new Branch("main", isCurrent: true).CheckoutName);
+    }
+
+    [Fact]
+    public void CheckoutName_Remote_DropsTheRemotePrefix()
+    {
+        // Checking out "origin/main" literally detaches HEAD; "main" creates a
+        // local branch that tracks it.
+        var branch = new Branch("origin/main", isCurrent: false, isRemote: true, remoteName: "origin");
+        Assert.Equal("main", branch.CheckoutName);
+    }
+
+    [Fact]
+    public void CheckoutName_RemoteWithSlashes_KeepsEverythingAfterTheRemote()
+    {
+        var branch = new Branch("upstream/feature/login", isCurrent: false, isRemote: true, remoteName: "upstream");
+        Assert.Equal("feature/login", branch.CheckoutName);
     }
 }
