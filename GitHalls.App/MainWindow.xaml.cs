@@ -268,4 +268,6 @@ public sealed partial class MainWindow : Window
 
         diffPage.UpdateDiff(ViewModel.CurrentDiff);
     }
+
+    public Visibility ToVisibility(bool isVisible) => isVisible ? Visibility.Visible : Visibility.Collapsed;
 }
