@@ -19,13 +19,15 @@ public sealed partial class DiffPage : Page
         {
             FilePathText.Text = string.Empty;
             StatsPanel.Visibility = Visibility.Collapsed;
-            DiffView.Visibility = Visibility.Collapsed;
+            // The whole card goes, not just its contents: an empty card framing
+            // the placeholder text would read as a failed load.
+            DiffCard.Visibility = Visibility.Collapsed;
             EmptyText.Visibility = Visibility.Visible;
             return;
         }
 
         FilePathText.Text = diff.FilePath;
-        DiffView.Visibility = Visibility.Visible;
+        DiffCard.Visibility = Visibility.Visible;
         EmptyText.Visibility = Visibility.Collapsed;
 
         if (diff.IsBinary)

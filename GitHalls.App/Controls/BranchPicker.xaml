@@ -22,14 +22,9 @@
                   SelectionMode="None" IsItemClickEnabled="True"
                   ItemClick="BranchList_ItemClick"
                   SelectionChanged="BranchList_SelectionChanged"
-                  ContainerContentChanging="BranchList_ContainerContentChanging">
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="MinHeight" Value="32" />
-                    <Setter Property="Padding" Value="10,2" />
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                </Style>
-            </ListView.ItemContainerStyle>
+                  ContainerContentChanging="BranchList_ContainerContentChanging"
+                  Style="{StaticResource GHListViewStyle}"
+                  ItemContainerStyle="{StaticResource GHCompactListItemStyle}">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="controls:BranchListItem">
                     <Grid>

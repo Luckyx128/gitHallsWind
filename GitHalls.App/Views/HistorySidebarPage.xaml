@@ -10,10 +10,12 @@
          the history list, so they moved to the main toolbar. -->
     <ListView ItemsSource="{x:Bind ViewModel.Commits, Mode=OneWay}"
               SelectedItem="{x:Bind ViewModel.SelectedCommit, Mode=TwoWay}"
-              SelectionMode="Single">
+              SelectionMode="Single"
+              Style="{StaticResource GHListViewStyle}"
+              ItemContainerStyle="{StaticResource GHListItemStyle}">
         <ListView.ItemTemplate>
             <DataTemplate x:DataType="models:Commit">
-                <Grid Padding="4,10">
+                <Grid Padding="0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -22,16 +24,13 @@
                     <PersonPicture Grid.Column="0" DisplayName="{x:Bind AuthorName}" Width="32" Height="32" Margin="0,0,12,0" />
 
                     <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
-                        <TextBlock Text="{x:Bind Summary}" FontWeight="SemiBold"
+                        <TextBlock Text="{x:Bind Summary}"
                                    TextTrimming="CharacterEllipsis" MaxLines="1"
                                    ToolTipService.ToolTip="{x:Bind Message}" />
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{x:Bind AuthorName}" FontSize="12"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       TextTrimming="CharacterEllipsis" MaxLines="1" />
+                            <TextBlock Text="{x:Bind AuthorName}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
                             <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                            <TextBlock Text="{x:Bind RelativeDate}" FontSize="12"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind RelativeDate}" Style="{StaticResource GHCaptionTextStyle}" />
                             <TextBlock Text="{x:Bind ShortHash}" FontSize="12" FontFamily="Cascadia Mono, Consolas"
                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                         </StackPanel>

@@ -14,23 +14,22 @@
         <!-- Which branch changes, stated before anything is picked. A merge
              updates the branch you are on, and that is the easy thing to forget. -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10" VerticalAlignment="Center">
-            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                    CornerRadius="6" Padding="10,4">
+            <Border Style="{StaticResource GHChipStyle}">
                 <TextBlock x:Name="SourceText" Text="Select a branch"
                            TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="140" />
             </Border>
 
             <FontIcon Glyph="&#xE72A;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-            <Border Background="{ThemeResource AccentFillColorSelectedTextBackgroundBrush}"
-                    CornerRadius="6" Padding="10,4">
+            <Border Style="{StaticResource GHChipStyle}"
+                    Background="{ThemeResource AccentFillColorSelectedTextBackgroundBrush}">
                 <TextBlock x:Name="TargetText" FontWeight="SemiBold"
                            TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="140" />
             </Border>
         </StackPanel>
 
-        <Border Grid.Row="1" BorderThickness="1" CornerRadius="6"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+        <!-- The picker sits in a card rather than a boxed-in outline. -->
+        <Border Grid.Row="1" Style="{StaticResource GHContentCardStyle}">
             <controls:BranchPicker x:Name="Picker" Height="260" />
         </Border>
 

@@ -12,8 +12,10 @@
 
         <controls:BranchPicker x:Name="Picker" Grid.Row="0" MinHeight="220" MaxHeight="340" />
 
-        <StackPanel Grid.Row="1" Spacing="6" Padding="8"
-                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+        <!-- Grouped by its own fill instead of a rule across the flyout. -->
+        <StackPanel Grid.Row="1" Spacing="6" Padding="10"
+                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    CornerRadius="0,0,8,8">
             <TextBlock Text="New branch" FontSize="12" FontWeight="SemiBold"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             <Grid ColumnSpacing="6">

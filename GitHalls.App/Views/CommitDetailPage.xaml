@@ -21,24 +21,29 @@
 
         <ScrollViewer x:Name="DetailScroller" Visibility="Collapsed"
                       VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
-            <StackPanel Spacing="16" Padding="16">
+            <StackPanel Spacing="12" Padding="12,4,12,12">
 
-                <StackPanel Spacing="6">
-                    <TextBlock x:Name="SummaryText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <!-- The commit itself reads as one Settings card: title, muted
+                     supporting line, optional body. -->
+                <StackPanel Spacing="6" Padding="16,12" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <TextBlock x:Name="SummaryText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock x:Name="AuthorText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="·" FontSize="13" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                        <TextBlock x:Name="DateText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="·" FontSize="13" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                        <TextBlock x:Name="HashText" FontSize="13" FontFamily="Cascadia Mono, Consolas"
+                        <TextBlock x:Name="AuthorText" Style="{StaticResource GHCaptionTextStyle}" />
+                        <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="DateText" Style="{StaticResource GHCaptionTextStyle}" />
+                        <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="HashText" FontSize="12" FontFamily="Cascadia Mono, Consolas"
                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                     </StackPanel>
                     <TextBlock x:Name="BodyText" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
                 </StackPanel>
 
-                <!-- One collapsible section per file, filled in code-behind. -->
-                <StackPanel x:Name="FileSections" Spacing="12" />
+                <!-- One collapsible section per file, filled in code-behind.
+                     4px apart, the spacing Settings uses inside a card group. -->
+                <StackPanel x:Name="FileSections" Spacing="4" />
             </StackPanel>
         </ScrollViewer>
     </Grid>

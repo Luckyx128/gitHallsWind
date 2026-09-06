@@ -1,0 +1,86 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        The look the Windows Settings app gets from three rules:
+
+          1. Nothing draws a divider line. Panes sit on the same Mica surface and
+             are told apart by the cards floating on it, never by a 1px rule.
+          2. Content lives in cards: card fill, hairline card stroke, 8px radius.
+          3. Rows are rounded and inset, so selection reads as a pill instead of
+             a full-bleed band.
+    -->
+
+    <!-- MARK: - Surfaces -->
+
+    <!-- The card that groups a block of content, as in "Configurações recomendadas". -->
+    <Style x:Key="GHCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16,12,16,12" />
+    </Style>
+
+    <!-- Same card, no padding: for cards that hold a list or a scroller. -->
+    <Style x:Key="GHContentCardStyle" TargetType="Border" BasedOn="{StaticResource GHCardStyle}">
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- A nested surface inside a card (a badge, an inline chip). -->
+    <Style x:Key="GHChipStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="10,4" />
+    </Style>
+
+    <!-- MARK: - Type ramp -->
+
+    <!-- Pane title, e.g. the file path over a diff. -->
+    <Style x:Key="GHPaneTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- The small label that names a group of controls. -->
+    <Style x:Key="GHSectionHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Supporting line under a title. -->
+    <Style x:Key="GHCaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- MARK: - Lists -->
+
+    <!-- Transparent so the Mica shows through; the rows carry the visuals. -->
+    <Style x:Key="GHListViewStyle" TargetType="ListView">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4,2,4,8" />
+    </Style>
+
+    <!-- Inset rounded row: Settings' navigation and list rows are 4px-rounded and
+         never touch the edge of their pane. -->
+    <Style x:Key="GHListItemStyle" TargetType="ListViewItem">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!-- The denser variant used inside flyouts (branch picker). -->
+    <Style x:Key="GHCompactListItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource GHListItemStyle}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="10,2" />
+    </Style>
+
+</ResourceDictionary>

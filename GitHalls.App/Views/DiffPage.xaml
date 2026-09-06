@@ -11,21 +11,20 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Padding="16,12"
-                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Spacing="16">
-                <TextBlock x:Name="FilePathText" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-                <StackPanel x:Name="StatsPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed">
-                    <TextBlock x:Name="AdditionsText" Foreground="#4CAF50" FontWeight="Bold" FontSize="13" />
-                    <TextBlock x:Name="DeletionsText" Foreground="#F44336" FontWeight="Bold" FontSize="13" />
-                </StackPanel>
+        <!-- Page title over the content, the way a Settings page names itself:
+             no panel behind it and no rule under it. -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Padding="14,10,14,8">
+            <TextBlock x:Name="FilePathText" Style="{StaticResource GHPaneTitleTextStyle}" VerticalAlignment="Center" />
+            <StackPanel x:Name="StatsPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock x:Name="AdditionsText" Foreground="#4CAF50" FontWeight="SemiBold" FontSize="13" />
+                <TextBlock x:Name="DeletionsText" Foreground="#F44336" FontWeight="SemiBold" FontSize="13" />
             </StackPanel>
-        </Border>
+        </StackPanel>
 
-        <controls:DiffTextView x:Name="DiffView" Grid.Row="1" />
+        <!-- The diff itself is the card floating on the window's Mica. -->
+        <Border x:Name="DiffCard" Grid.Row="1" Style="{StaticResource GHContentCardStyle}" Margin="12,0,12,12">
+            <controls:DiffTextView x:Name="DiffView" />
+        </Border>
 
         <TextBlock x:Name="EmptyText" Grid.Row="1"
                    Text="Select a file to see its changes."
