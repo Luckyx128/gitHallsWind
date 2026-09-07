@@ -86,6 +86,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isLoadingCommitFileDiff;
 
+    /// <summary>Show diffs side by side rather than unified. Persisted.</summary>
+    [ObservableProperty]
+    private bool _isSideBySideDiff;
+
     /// <summary>
     /// Identifies the most recent async load of each kind. A slow response for
     /// a selection the user has already moved away from must not overwrite what
@@ -211,6 +215,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         _recentBranchesByRepo = settings.RecentBranches ?? new Dictionary<string, List<string>>();
 
+        IsSideBySideDiff = settings.SideBySideDiff;
+
         if (!string.IsNullOrEmpty(settings.LastOpenedRepository) && Directory.Exists(settings.LastOpenedRepository))
         {
             RepositoryPath = settings.LastOpenedRepository;
@@ -263,6 +269,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
             CurrentDiff = null;
         }
     }
+
+    partial void OnIsSideBySideDiffChanged(bool value) => Save();
 
     partial void OnSelectedCommitChanged(Commit? value)
     {
@@ -419,7 +427,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     {
         RecentRepositories = RecentRepositories.ToList(),
         LastOpenedRepository = RepositoryPath,
-        RecentBranches = _recentBranchesByRepo
+        RecentBranches = _recentBranchesByRepo,
+        SideBySideDiff = IsSideBySideDiff
     });
 
     private void LoadRecentBranches()

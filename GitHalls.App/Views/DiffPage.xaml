@@ -23,7 +23,7 @@
 
         <!-- The diff itself is the card floating on the window's Mica. -->
         <Border x:Name="DiffCard" Grid.Row="1" Style="{StaticResource GHContentCardStyle}" Margin="12,0,12,12">
-            <controls:DiffTextView x:Name="DiffView" />
+            <controls:DiffViewer x:Name="DiffView" />
         </Border>
 
         <TextBlock x:Name="EmptyText" Grid.Row="1"

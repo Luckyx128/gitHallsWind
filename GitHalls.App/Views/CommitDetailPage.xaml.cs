@@ -100,6 +100,9 @@ public sealed partial class CommitDetailPage : Page
 
     private void UpdateDiff()
     {
+        // Cheap when unchanged; the viewer only rebuilds on a real switch.
+        DiffView.SideBySide = ViewModel.IsSideBySideDiff;
+
         var loading = ViewModel.IsLoadingCommitFileDiff;
         DiffLoadingRing.IsActive = loading;
         DiffLoadingRing.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;

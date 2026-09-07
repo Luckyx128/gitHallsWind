@@ -11,6 +11,10 @@ public sealed partial class DiffPage : Page
         InitializeComponent();
     }
 
+    /// <summary>Unified or side by side. Kept out of the page's own state: the
+    /// window owns the preference and hands it over with every update.</summary>
+    public void SetSideBySide(bool sideBySide) => DiffView.SideBySide = sideBySide;
+
     public void UpdateDiff(FileDiff? diff)
     {
         DiffView.SetDiff(diff);

@@ -1,0 +1,23 @@
+<UserControl
+    x:Class="GitHalls.App.Controls.DiffViewer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:GitHalls.App.Controls">
+
+    <Grid>
+        <controls:DiffTextView x:Name="UnifiedView" />
+
+        <!-- The 1px column gap, filled by the grid's own background, is the only
+             line between the two sides. -->
+        <Grid x:Name="SplitGrid" Visibility="Collapsed" ColumnSpacing="1"
+              Background="{ThemeResource CardStrokeColorDefaultBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <controls:DiffTextView x:Name="LeftView" Grid.Column="0" SingleNumberColumn="True" />
+            <controls:DiffTextView x:Name="RightView" Grid.Column="1" SingleNumberColumn="True" />
+        </Grid>
+    </Grid>
+</UserControl>

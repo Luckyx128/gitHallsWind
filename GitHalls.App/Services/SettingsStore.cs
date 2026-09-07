@@ -10,6 +10,9 @@ public class AppSettings
 
     /// <summary>Recently checked-out branches, keyed by repository path.</summary>
     public Dictionary<string, List<string>> RecentBranches { get; set; } = new();
+
+    /// <summary>Show diffs side by side rather than unified.</summary>
+    public bool SideBySideDiff { get; set; }
 }
 
 /// <summary>

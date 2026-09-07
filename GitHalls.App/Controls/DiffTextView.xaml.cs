@@ -70,6 +70,22 @@ public sealed partial class DiffTextView : UserControl
 
     private bool IsIntrinsic => !double.IsNaN(MaxIntrinsicHeight);
 
+    /// <summary>
+    /// Draw one line-number column instead of old and new. Each side of a
+    /// side-by-side view carries only its own numbers, so the second column
+    /// would always be empty there.
+    /// </summary>
+    public bool SingleNumberColumn { get; set; }
+
+    /// <summary>Current vertical scroll position, in pixels.</summary>
+    public double VerticalOffset => Scroller.VerticalOffset;
+
+    /// <summary>Raised whenever this view scrolls, so another can follow it.</summary>
+    public event EventHandler<double>? VerticalOffsetChanged;
+
+    /// <summary>Scrolls to <paramref name="offset"/> without animating.</summary>
+    public void SetVerticalOffset(double offset) => Scroller.ChangeView(null, offset, null, disableAnimation: true);
+
     public DiffTextView() : this(ColorCodeDiffHighlighter.Instance) { }
 
     public DiffTextView(IDiffHighlighter highlighter)
@@ -218,7 +234,10 @@ public sealed partial class DiffTextView : UserControl
         // measuring a text block per render would be wasted work.
         var digitWidth = DiffTextTheme.GutterFontSize * 0.62;
         _numberColumnWidth = digits * digitWidth + 4;
-        _gutterWidth = Math.Ceiling(GutterPadding + MarkerWidth + ColumnGap + _numberColumnWidth + ColumnGap + _numberColumnWidth + GutterPadding);
+
+        var numberColumns = SingleNumberColumn ? 1 : 2;
+        _gutterWidth = Math.Ceiling(
+            GutterPadding + MarkerWidth + numberColumns * (ColumnGap + _numberColumnWidth) + GutterPadding);
     }
 
     private void UpdateContentSize()
@@ -251,6 +270,7 @@ public sealed partial class DiffTextView : UserControl
         // exactly the horizontal offset to stay pinned at the left edge.
         GutterTransform.X = Scroller.HorizontalOffset;
         RepaintLayers(force: false);
+        VerticalOffsetChanged?.Invoke(this, Scroller.VerticalOffset);
     }
 
     private void Scroller_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -336,10 +356,17 @@ public sealed partial class DiffTextView : UserControl
 
         var markerX = GutterPadding;
         var oldColumnX = markerX + MarkerWidth + ColumnGap;
-        var newColumnX = oldColumnX + _numberColumnWidth + ColumnGap;
 
-        AddNumber(line.OldLineNumber, oldColumnX, y);
-        AddNumber(line.NewLineNumber, newColumnX, y);
+        if (SingleNumberColumn)
+        {
+            // Only one of the two is ever set on a split side.
+            AddNumber(line.OldLineNumber ?? line.NewLineNumber, oldColumnX, y);
+        }
+        else
+        {
+            AddNumber(line.OldLineNumber, oldColumnX, y);
+            AddNumber(line.NewLineNumber, oldColumnX + _numberColumnWidth + ColumnGap, y);
+        }
 
         var (symbol, markerColor) = line.Type switch
         {

@@ -147,6 +147,9 @@
                         </StackPanel>
                     </CommandBar.Content>
 
+                    <AppBarToggleButton x:Name="SideBySideToggle" Icon="TwoPage" LabelPosition="Collapsed"
+                                        ToolTipService.ToolTip="Side-by-side diff"
+                                        Click="SideBySideToggle_Click" />
                     <AppBarButton Icon="Refresh" LabelPosition="Collapsed" ToolTipService.ToolTip="Refresh (Ctrl+R)" Command="{x:Bind ViewModel.RefreshCommand}" />
                     <AppBarButton Icon="Shuffle" LabelPosition="Collapsed" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
                     <AppBarButton Icon="More" LabelPosition="Collapsed" ToolTipService.ToolTip="Repository actions">

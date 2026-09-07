@@ -65,6 +65,7 @@ public sealed partial class MainWindow : Window
         {
             SidebarFrame.Navigate(typeof(ChangesSidebarPage), ViewModel, suppressInfo);
             ContentFrame.Navigate(typeof(DiffPage), null, suppressInfo);
+            (ContentFrame.Content as DiffPage)?.SetSideBySide(ViewModel.IsSideBySideDiff);
             (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff);
         }
     }
@@ -260,6 +261,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void SideBySideToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.IsSideBySideDiff = SideBySideToggle.IsChecked == true;
+    }
+
     private void ErrorBar_CloseButtonClick(InfoBar sender, object args) => ViewModel.ClearError();
 
     // MARK: - Diff
@@ -288,6 +294,14 @@ public sealed partial class MainWindow : Window
                 // Only if that pane is the one on screen — the History tab owns
                 // the frame while it is selected.
                 (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff);
+                break;
+
+            case nameof(RepositoryViewModel.IsSideBySideDiff):
+                // Also reaches the toggle, which starts out reflecting a setting
+                // that is only read once the window is already up.
+                SideBySideToggle.IsChecked = ViewModel.IsSideBySideDiff;
+                (ContentFrame.Content as DiffPage)?.SetSideBySide(ViewModel.IsSideBySideDiff);
+                (ContentFrame.Content as CommitDetailPage)?.Update();
                 break;
 
             case nameof(RepositoryViewModel.SelectedCommit):
