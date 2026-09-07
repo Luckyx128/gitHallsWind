@@ -62,6 +62,7 @@
                              Margin="8,4,8,0" HorizontalAlignment="Left">
                     <SelectorBarItem x:Name="ChangesTab" Text="Changes" />
                     <SelectorBarItem x:Name="HistoryTab" Text="History" />
+                    <SelectorBarItem x:Name="KanbanTab" Text="Kanban" />
                 </SelectorBar>
 
                 <Frame x:Name="SidebarFrame" Grid.Row="1" />
@@ -122,6 +123,30 @@
                                 </DropDownButton.Flyout>
                             </DropDownButton>
 
+                            <!-- Who commits here. Beside the repository and the
+                                 branch because it is the third thing that is true
+                                 of this repository and not of the next one. -->
+                            <DropDownButton x:Name="IdentityButton" Height="32" MaxWidth="180"
+                                            HorizontalContentAlignment="Left">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE77B;" />
+                                    <TextBlock x:Name="IdentityButtonText" Text="Identity"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                </StackPanel>
+                                <DropDownButton.Flyout>
+                                    <Flyout x:Name="IdentityFlyout" Placement="Bottom" Opening="IdentityFlyout_Opening"
+                                            ShouldConstrainToRootBounds="False">
+                                        <Flyout.FlyoutPresenterStyle>
+                                            <Style TargetType="FlyoutPresenter">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="MaxWidth" Value="340" />
+                                            </Style>
+                                        </Flyout.FlyoutPresenterStyle>
+                                        <controls:IdentitySwitcher x:Name="IdentitySwitcherControl" />
+                                    </Flyout>
+                                </DropDownButton.Flyout>
+                            </DropDownButton>
+
                             <!-- One button whose label states what is actually needed:
                                  Push (N) / Pull (N) / Publish Branch / Up to date.
                                  Port of SyncButton.swift. -->
@@ -157,6 +182,8 @@
                             <MenuFlyout>
                                 <MenuFlyoutItem Text="Reveal in File Explorer" Click="RevealInExplorer_Click" />
                                 <MenuFlyoutItem Text="Open in Terminal" Click="OpenTerminal_Click" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Settings..." Click="OpenSettings_Click" />
                             </MenuFlyout>
                         </AppBarButton.Flyout>
                     </AppBarButton>

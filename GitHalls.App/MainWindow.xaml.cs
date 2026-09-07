@@ -17,17 +17,32 @@ public sealed partial class MainWindow : Window
     private readonly GitService _gitService = new();
     private readonly PlatformActions _platformActions = new();
 
+    /// <summary>One store for the whole app: several screens write to it.</summary>
+    private readonly SettingsStore _settingsStore = new();
+
+    private readonly JiraAccountStore _jiraAccount;
+
+    /// <summary>Open settings window, if any — a second one would fight the first.</summary>
+    private SettingsWindow? _settingsWindow;
+
     /// <summary>Sidebar width to restore when it is expanded again.</summary>
     private double _restoreSidebarWidth = 280;
 
     public RepositoryViewModel ViewModel { get; }
+
+    /// <summary>Jira state, separate from the repository's. They meet only in the issue detail pane.</summary>
+    public JiraViewModel JiraViewModel { get; }
 
     public MainWindow()
     {
         InitializeComponent();
         SetTitleBar(AppTitleBar);
 
-        ViewModel = new RepositoryViewModel(_gitService, new SettingsStore());
+        ViewModel = new RepositoryViewModel(_gitService, _settingsStore);
+
+        _jiraAccount = new JiraAccountStore(_settingsStore);
+        JiraViewModel = new JiraViewModel(_jiraAccount);
+        JiraViewModel.PropertyChanged += JiraViewModel_PropertyChanged;
 
         Activated += MainWindow_Activated;
         Closed += (_, _) => ViewModel.Dispose();
@@ -36,7 +51,27 @@ public sealed partial class MainWindow : Window
 
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
 
-        _ = ViewModel.InitializeAsync();
+        _ = StartAsync();
+    }
+
+    /// <summary>
+    /// Settings arrive asynchronously, and the Jira account is read from them —
+    /// so anything that depends on "is an account connected" has to wait for
+    /// this, not for the constructor.
+    /// </summary>
+    private async Task StartAsync()
+    {
+        await ViewModel.InitializeAsync();
+
+        JiraViewModel.NotifyAccountChanged();
+
+        // Only if the board is what's on screen: opening the app on Changes
+        // should not call Jira at all.
+        if (SidebarFrame.Content is KanbanSidebarPage kanban)
+        {
+            kanban.Update();
+            if (JiraViewModel.IsConfigured && !JiraViewModel.HasSearched) await JiraViewModel.RefreshAsync();
+        }
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
@@ -55,7 +90,15 @@ public sealed partial class MainWindow : Window
 
         // Sidebar and detail pane move together: Changes pairs with the file
         // diff, History with the commit detail.
-        if (sender.SelectedItem == HistoryTab)
+        if (sender.SelectedItem == KanbanTab)
+        {
+            SidebarFrame.Navigate(typeof(KanbanSidebarPage), JiraViewModel, suppressInfo);
+            if (SidebarFrame.Content is KanbanSidebarPage kanban) kanban.SettingsRequested += (_, _) => OpenSettings();
+
+            ContentFrame.Navigate(typeof(IssueDetailPage), new IssueDetailParameter(JiraViewModel, ViewModel), suppressInfo);
+            (ContentFrame.Content as IssueDetailPage)?.Update();
+        }
+        else if (sender.SelectedItem == HistoryTab)
         {
             SidebarFrame.Navigate(typeof(HistorySidebarPage), ViewModel, suppressInfo);
             ContentFrame.Navigate(typeof(CommitDetailPage), ViewModel, suppressInfo);
@@ -69,6 +112,67 @@ public sealed partial class MainWindow : Window
             (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff);
         }
     }
+
+    // MARK: - Jira
+
+    private void JiraViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(ViewModels.JiraViewModel.SelectedIssue):
+                // Both panes: the sidebar has to move its highlight too.
+                (SidebarFrame.Content as KanbanSidebarPage)?.Update();
+                (ContentFrame.Content as IssueDetailPage)?.Update();
+                break;
+
+            case nameof(ViewModels.JiraViewModel.IsLoading):
+            case nameof(ViewModels.JiraViewModel.ErrorMessage):
+            case nameof(ViewModels.JiraViewModel.HasSearched):
+                (SidebarFrame.Content as KanbanSidebarPage)?.Update();
+                break;
+        }
+    }
+
+    // MARK: - Settings
+
+    private void OpenSettings_Click(object sender, RoutedEventArgs e) => OpenSettings();
+
+    private void OpenSettings()
+    {
+        if (_settingsWindow != null)
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+
+        var window = new SettingsWindow(_jiraAccount, ViewModel);
+        _settingsWindow = window;
+
+        window.AccountChanged += (_, _) =>
+        {
+            JiraViewModel.NotifyAccountChanged();
+            (SidebarFrame.Content as KanbanSidebarPage)?.Update();
+
+            // Newly connected and nothing on screen yet: fill the board.
+            if (JiraViewModel.IsConfigured && !JiraViewModel.HasSearched) _ = JiraViewModel.RefreshAsync();
+        };
+
+        window.Closed += (_, _) => _settingsWindow = null;
+        window.Activate();
+    }
+
+    private void IdentityFlyout_Opening(object? sender, object e)
+    {
+        IdentitySwitcherControl.ActionCompleted -= IdentitySwitcher_ActionCompleted;
+        IdentitySwitcherControl.ActionCompleted += IdentitySwitcher_ActionCompleted;
+        IdentitySwitcherControl.ManageRequested -= IdentitySwitcher_ManageRequested;
+        IdentitySwitcherControl.ManageRequested += IdentitySwitcher_ManageRequested;
+        IdentitySwitcherControl.Load(ViewModel);
+    }
+
+    private void IdentitySwitcher_ActionCompleted(object? sender, EventArgs e) => IdentityFlyout.Hide();
+
+    private void IdentitySwitcher_ManageRequested(object? sender, EventArgs e) => OpenSettings();
 
     // MARK: - Repository
 
@@ -280,11 +384,25 @@ public sealed partial class MainWindow : Window
             TitleBarText.Text = name == null ? "GitHalls" : $"GitHalls — {name}";
             RepositoryButtonText.Text = name ?? "Open Repository";
             ToolTipService.SetToolTip(RepositoryButton, ViewModel.RepositoryPath ?? "No repository open");
+
+            // It names the repository a branch would be created in.
+            (ContentFrame.Content as IssueDetailPage)?.Update();
             return;
         }
 
         switch (e.PropertyName)
         {
+            case nameof(RepositoryViewModel.IsBusy):
+                // "Create Branch" is disabled while git is working.
+                (ContentFrame.Content as IssueDetailPage)?.Update();
+                break;
+
+            case nameof(RepositoryViewModel.CurrentAuthor):
+                var author = ViewModel.CurrentAuthor;
+                IdentityButtonText.Text = author == null ? "No identity" : author.Name;
+                ToolTipService.SetToolTip(IdentityButton, author?.ToString() ?? "git has no name or email configured here");
+                break;
+
             case nameof(RepositoryViewModel.CurrentBranch):
                 BranchButtonText.Text = ViewModel.CurrentBranch?.Name ?? "Branch";
                 ToolTipService.SetToolTip(BranchButton, ViewModel.CurrentBranch?.Name ?? "No branch");

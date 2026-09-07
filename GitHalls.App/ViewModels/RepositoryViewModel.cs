@@ -90,6 +90,24 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isSideBySideDiff;
 
+    /// <summary>Who git would record as the author of a commit here.</summary>
+    [ObservableProperty]
+    private GitAuthor? _currentAuthor;
+
+    /// <summary>
+    /// True when this repository sets its own user.name — worth showing, because
+    /// it decides whether the identity in use came from here or from the global
+    /// config every other repository shares.
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasLocalIdentityOverride;
+
+    [ObservableProperty]
+    private bool _isSwitchingIdentity;
+
+    /// <summary>Identity profiles the user saved, in the order they were added.</summary>
+    public ObservableCollection<GitIdentity> SavedIdentities { get; } = new();
+
     /// <summary>
     /// Identifies the most recent async load of each kind. A slow response for
     /// a selection the user has already moved away from must not overwrite what
@@ -217,6 +235,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         IsSideBySideDiff = settings.SideBySideDiff;
 
+        SavedIdentities.Clear();
+        foreach (var identity in settings.GitIdentities) SavedIdentities.Add(identity);
+
         if (!string.IsNullOrEmpty(settings.LastOpenedRepository) && Directory.Exists(settings.LastOpenedRepository))
         {
             RepositoryPath = settings.LastOpenedRepository;
@@ -230,6 +251,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         SelectedChange = null;
         CurrentDiff = null;
         SelectedCommit = null;
+        CurrentAuthor = null;
+        HasLocalIdentityOverride = false;
         ErrorMessage = null;
 
         if (string.IsNullOrEmpty(value)) return;
@@ -423,12 +446,18 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         Save();
     }
 
-    private void Save() => _ = _settingsStore.SaveAsync(new AppSettings
+    /// <summary>
+    /// Writes only the parts this view model owns. The settings file has other
+    /// writers — the Jira account, for one — and replacing the whole object here
+    /// would drop whatever they had just saved.
+    /// </summary>
+    private void Save() => _ = _settingsStore.UpdateAsync(settings =>
     {
-        RecentRepositories = RecentRepositories.ToList(),
-        LastOpenedRepository = RepositoryPath,
-        RecentBranches = _recentBranchesByRepo,
-        SideBySideDiff = IsSideBySideDiff
+        settings.RecentRepositories = RecentRepositories.ToList();
+        settings.LastOpenedRepository = RepositoryPath;
+        settings.RecentBranches = _recentBranchesByRepo;
+        settings.SideBySideDiff = IsSideBySideDiff;
+        settings.GitIdentities = SavedIdentities.ToList();
     });
 
     private void LoadRecentBranches()
@@ -510,6 +539,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         var branches = await _gitService.GetBranchesAsync(repoPath);
         MergeBranches(branches);
+
+        CurrentAuthor = await _gitService.GetAuthorAsync(repoPath);
+        HasLocalIdentityOverride = await _gitService.HasLocalIdentityAsync(repoPath);
 
         // One call answers both "is there an upstream" and "how far apart are
         // we", replacing a separate rev-parse per refresh.
@@ -623,6 +655,102 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         finally
         {
             if (_diffRequestToken == token) IsLoadingDiff = false;
+        }
+    }
+
+    // MARK: - Identity
+
+    /// <summary>Adds a profile, or replaces the one with the same id.</summary>
+    public void SaveIdentity(GitIdentity identity)
+    {
+        var existing = SavedIdentities.FirstOrDefault(i => i.Id == identity.Id);
+        if (existing == null)
+        {
+            SavedIdentities.Add(identity);
+        }
+        else
+        {
+            SavedIdentities[SavedIdentities.IndexOf(existing)] = identity;
+        }
+
+        Save();
+    }
+
+    public void RemoveIdentity(string id)
+    {
+        var existing = SavedIdentities.FirstOrDefault(i => i.Id == id);
+        if (existing == null) return;
+
+        SavedIdentities.Remove(existing);
+        Save();
+    }
+
+    /// <summary>
+    /// Switches who commits here. Writes the identity into this repository only,
+    /// never the global config: the point of profiles is that one repository can
+    /// differ from the rest without the user having to remember it does.
+    ///
+    /// Rewriting the remote is optional and separate, because it changes how the
+    /// repository authenticates, not who it credits.
+    /// </summary>
+    public async Task SetIdentityAsync(GitIdentity identity, bool fixRemoteUrl)
+    {
+        var repoPath = RepositoryPath;
+        if (string.IsNullOrEmpty(repoPath) || IsSwitchingIdentity) return;
+
+        IsSwitchingIdentity = true;
+        try
+        {
+            await _gitService.SetIdentityAsync(repoPath, identity.Name, identity.Email);
+
+            if (fixRemoteUrl && !string.IsNullOrWhiteSpace(identity.GitHubUsername))
+            {
+                try
+                {
+                    await _gitService.SetRemoteUsernameAsync(repoPath, identity.GitHubUsername);
+                }
+                catch (Exception ex)
+                {
+                    // The identity itself did change; say what didn't rather than
+                    // reporting the whole switch as a failure.
+                    ErrorMessage = $"Identity changed, but the remote URL was left alone: {ex.Message}";
+                    return;
+                }
+            }
+
+            ErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSwitchingIdentity = false;
+        }
+
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    /// Hands a GitHub token to git's own credential helper. The app stores no
+    /// copy of it — this exists because push and fetch authenticate separately
+    /// from who the commits credit, and that surprises people.
+    /// </summary>
+    public async Task<bool> SaveGitHubTokenAsync(string token, string username)
+    {
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(username)) return false;
+
+        try
+        {
+            await _gitService.ApproveCredentialAsync(username, token);
+            ErrorMessage = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            return false;
         }
     }
 

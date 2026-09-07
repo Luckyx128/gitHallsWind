@@ -169,6 +169,112 @@ public class GitService
         return _diffParser.Parse(filePath, result.StandardOutput);
     }
 
+    // MARK: - Identity
+
+    /// <summary>
+    /// The author git would record for a commit here, or null when neither name
+    /// nor email is configured anywhere. Reads the effective value, so it may
+    /// come from the repository, the global file or the system one.
+    /// </summary>
+    public async Task<GitAuthor?> GetAuthorAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        var name = await TryReadConfigAsync(repoPath, "user.name", localOnly: false, cancellationToken);
+        var email = await TryReadConfigAsync(repoPath, "user.email", localOnly: false, cancellationToken);
+
+        if (name == null && email == null) return null;
+
+        return new GitAuthor(name ?? string.Empty, email ?? string.Empty);
+    }
+
+    /// <summary>
+    /// True when this repository sets its own identity, rather than inheriting
+    /// the global one. Worth saying out loud in the UI: the difference decides
+    /// whether a change here affects every other repository on the machine.
+    /// </summary>
+    public async Task<bool> HasLocalIdentityAsync(string repoPath, CancellationToken cancellationToken = default) =>
+        await TryReadConfigAsync(repoPath, "user.name", localOnly: true, cancellationToken) != null;
+
+    /// <summary>Writes the identity into this repository only.</summary>
+    public async Task SetIdentityAsync(string repoPath, string name, string email, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "config", "--local", "user.name", name }, cancellationToken: cancellationToken);
+        await _runner.RunAsync(repoPath, new[] { "config", "--local", "user.email", email }, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// "git config <key>" exits non-zero when the key is unset, which the runner
+    /// raises as an error. An unset identity is a normal state, not a failure.
+    /// </summary>
+    private async Task<string?> TryReadConfigAsync(string repoPath, string key, bool localOnly, CancellationToken cancellationToken)
+    {
+        var args = localOnly ? new[] { "config", "--local", key } : new[] { "config", key };
+
+        try
+        {
+            var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+            var value = result.StandardOutput.Trim();
+            return value.Length == 0 ? null : value;
+        }
+        catch (GitException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> GetRemoteUrlAsync(string repoPath, string remoteName = "origin", CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _runner.RunAsync(repoPath, new[] { "remote", "get-url", remoteName }, cancellationToken: cancellationToken);
+            var url = result.StandardOutput.Trim();
+            return url.Length == 0 ? null : url;
+        }
+        catch (GitException)
+        {
+            // No such remote — the repository simply has none.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Puts a username into the https remote, so a push authenticates as that
+    /// account instead of whichever one the credential helper answers with
+    /// first. Only https carries a username; an SSH remote picks its account
+    /// through the key, and rewriting it here would be wrong.
+    /// </summary>
+    public async Task SetRemoteUsernameAsync(string repoPath, string username, string remoteName = "origin", CancellationToken cancellationToken = default)
+    {
+        var current = await GetRemoteUrlAsync(repoPath, remoteName, cancellationToken)
+            ?? throw new GitException($"Remote \"{remoteName}\" has no URL.", string.Empty);
+
+        if (!current.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GitException("Only an https remote carries a username; this one does not.", current);
+        }
+
+        if (GitRemoteUrl.OwnerAndRepository(current) is not { } parts)
+        {
+            throw new GitException("That remote is not a GitHub URL this app can rewrite.", current);
+        }
+
+        var updated = GitRemoteUrl.WithUsername(parts.Owner, parts.Repository, username);
+        await _runner.RunAsync(repoPath, new[] { "remote", "set-url", remoteName, updated }, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Hands a username and token to git's own credential helper — on Windows,
+    /// the Credential Manager that Git for Windows installs by default. The app
+    /// keeps no copy: it writes the credential and forgets it.
+    /// </summary>
+    public async Task ApproveCredentialAsync(string username, string token, string host = "github.com", CancellationToken cancellationToken = default)
+    {
+        // The trailing blank line ends the input; git waits for it.
+        var input = $"protocol=https\nhost={host}\nusername={username}\npassword={token}\n\n";
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        await _runner.RunAsync(home, new[] { "credential", "approve" }, stdinData: input, cancellationToken: cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Branch>> GetBranchesAsync(string repoPath, CancellationToken cancellationToken = default)
     {
         var result = await _runner.RunAsync(repoPath, new[] { "branch", "-a", "--no-color" }, cancellationToken: cancellationToken);

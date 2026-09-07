@@ -1,0 +1,90 @@
+<Page
+    x:Class="GitHalls.App.Views.KanbanSidebarPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:GitHalls.App.Views"
+    x:Name="PageRoot"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Padding="12,8,12,4" ColumnSpacing="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- The query is the board: Jira's own language, not a filter we invent. -->
+            <TextBox x:Name="JqlTextBox" Grid.Column="0" Height="32"
+                     PlaceholderText="JQL"
+                     KeyDown="JqlTextBox_KeyDown"
+                     ToolTipService.ToolTip="Jira Query Language — press Enter to run" />
+
+            <Button Grid.Column="1" Width="32" Height="32" Padding="0"
+                    Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                    Click="Refresh_Click"
+                    ToolTipService.ToolTip="Run the query" />
+        </Grid>
+
+        <ListView x:Name="IssueList" Grid.Row="1"
+                  SelectionMode="Single"
+                  SelectionChanged="IssueList_SelectionChanged"
+                  ContainerContentChanging="IssueList_ContainerContentChanging"
+                  Style="{StaticResource GHListViewStyle}"
+                  ItemContainerStyle="{StaticResource GHListItemStyle}">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="views:KanbanRow">
+                    <Grid Padding="0,2" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- The dot carries the status category, the only field
+                             that means the same thing across projects. -->
+                        <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Center"
+                                 Fill="{x:Bind CategoryBrush}"
+                                 Visibility="{x:Bind DotVisibility}" />
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="{x:Bind ToolTip}">
+                            <TextBlock Text="{x:Bind Title}"
+                                       FontSize="{x:Bind FontSize}"
+                                       FontWeight="{x:Bind FontWeight}"
+                                       Foreground="{x:Bind Foreground}"
+                                       TextTrimming="CharacterEllipsis" MaxLines="1" />
+                            <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource GHCaptionTextStyle}"
+                                       Visibility="{x:Bind SubtitleVisibility}" MaxLines="1" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="2" Text="{x:Bind Trailing}"
+                                   Style="{StaticResource GHCaptionTextStyle}"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Not connected / nothing found / still loading, one at a time. -->
+        <StackPanel x:Name="StatePanel" Grid.Row="1" Spacing="10" Padding="24"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="Collapsed">
+            <TextBlock x:Name="StateGlyph" Text="&#xE71B;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                       HorizontalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            <TextBlock x:Name="StateText" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Button x:Name="ConnectButton" Content="Open Settings" HorizontalAlignment="Center"
+                    Click="Connect_Click" Visibility="Collapsed" />
+        </StackPanel>
+
+        <ProgressRing x:Name="LoadingRing" Grid.Row="1" IsActive="False" Visibility="Collapsed"
+                      Width="24" Height="24"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+</Page>
