@@ -14,6 +14,7 @@ public class GitService
     private readonly DiffParser _diffParser;
     private readonly CommitLogParser _logParser;
     private readonly BranchParser _branchParser;
+    private readonly CommitFileParser _commitFileParser;
 
     public GitService(IGitProcessRunner? runner = null)
     {
@@ -22,6 +23,7 @@ public class GitService
         _diffParser = new DiffParser();
         _logParser = new CommitLogParser();
         _branchParser = new BranchParser();
+        _commitFileParser = new CommitFileParser();
     }
 
     public async Task<IReadOnlyList<FileChange>> GetStatusAsync(string repoPath, CancellationToken cancellationToken = default)
@@ -138,21 +140,22 @@ public class GitService
     }
 
     /// <summary>
-    /// Paths a commit touched. The empty --pretty=format: suppresses the commit
-    /// header so only the file list comes back.
+    /// Every file a commit touched, with its status and line counts but without
+    /// any diff content. One process for the whole commit — the diff of a single
+    /// file comes later, from <see cref="GetCommitFileDiffAsync"/>, and only for
+    /// the file the user opens.
+    ///
+    /// The empty --pretty=format: suppresses the commit header, so only the file
+    /// list comes back.
     /// </summary>
-    public async Task<IReadOnlyList<string>> GetCommitChangedPathsAsync(string repoPath, string hash, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CommitFile>> GetCommitFilesAsync(string repoPath, string hash, CancellationToken cancellationToken = default)
     {
         var result = await _runner.RunAsync(
             repoPath,
-            new[] { "show", "--pretty=format:", "--name-only", hash },
+            new[] { "show", "--pretty=format:", "--raw", "--numstat", "-z", hash },
             cancellationToken: cancellationToken);
 
-        return result.StandardOutput
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Trim())
-            .Where(line => line.Length > 0)
-            .ToList();
+        return _commitFileParser.Parse(result.StandardOutput);
     }
 
     /// <summary>Diff a single commit introduced for one path.</summary>

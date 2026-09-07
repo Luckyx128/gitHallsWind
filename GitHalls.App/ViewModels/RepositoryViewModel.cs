@@ -66,11 +66,25 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private Commit? _selectedCommit;
 
-    [ObservableProperty]
-    private CommitDetail? _selectedCommitDetail;
+    /// <summary>
+    /// The files of the selected commit, without their diffs. Selecting a commit
+    /// costs one git call for this list; the diff of a file is loaded when that
+    /// file is selected, and no sooner.
+    /// </summary>
+    public ObservableCollection<CommitFile> CommitFiles { get; } = new();
 
     [ObservableProperty]
-    private bool _isLoadingCommitDetail;
+    private CommitFile? _selectedCommitFile;
+
+    /// <summary>Diff of <see cref="SelectedCommitFile"/>, loaded on demand.</summary>
+    [ObservableProperty]
+    private FileDiff? _commitFileDiff;
+
+    [ObservableProperty]
+    private bool _isLoadingCommitFiles;
+
+    [ObservableProperty]
+    private bool _isLoadingCommitFileDiff;
 
     /// <summary>
     /// Identifies the most recent async load of each kind. A slow response for
@@ -79,7 +93,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     /// publishing anything.
     /// </summary>
     private Guid _diffRequestToken;
-    private Guid _commitDetailRequestToken;
+    private Guid _commitFilesRequestToken;
+    private Guid _commitFileDiffRequestToken;
 
     [ObservableProperty]
     private Branch? _currentBranch;
@@ -209,7 +224,6 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         SelectedChange = null;
         CurrentDiff = null;
         SelectedCommit = null;
-        SelectedCommitDetail = null;
         ErrorMessage = null;
 
         if (string.IsNullOrEmpty(value)) return;
@@ -252,47 +266,95 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedCommitChanged(Commit? value)
     {
-        _ = LoadCommitDetailAsync();
+        _ = LoadCommitFilesAsync();
     }
 
-    private async Task LoadCommitDetailAsync()
+    partial void OnSelectedCommitFileChanged(CommitFile? value)
+    {
+        _ = LoadCommitFileDiffAsync(value);
+    }
+
+    /// <summary>
+    /// Lists what the selected commit touched. One git call, no diff content:
+    /// a 40-file commit used to mean 41 calls before anything appeared, and the
+    /// pane then rendered ten diffs the user had not asked for.
+    /// </summary>
+    private async Task LoadCommitFilesAsync()
     {
         var repoPath = RepositoryPath;
         var commit = SelectedCommit;
 
+        var token = Guid.NewGuid();
+        _commitFilesRequestToken = token;
+
+        // Whatever was on screen belongs to the commit we just left.
+        SelectedCommitFile = null;
+        CommitFiles.Clear();
+
         if (string.IsNullOrEmpty(repoPath) || commit == null)
         {
-            SelectedCommitDetail = null;
+            IsLoadingCommitFiles = false;
             return;
         }
 
-        var token = Guid.NewGuid();
-        _commitDetailRequestToken = token;
-        IsLoadingCommitDetail = true;
+        IsLoadingCommitFiles = true;
 
         try
         {
-            var paths = await _gitService.GetCommitChangedPathsAsync(repoPath, commit.Hash);
+            var files = await _gitService.GetCommitFilesAsync(repoPath, commit.Hash);
 
-            var diffs = new List<FileDiff>(paths.Count);
-            foreach (var path in paths)
-            {
-                if (_commitDetailRequestToken != token) return;
-                diffs.Add(await _gitService.GetCommitFileDiffAsync(repoPath, commit.Hash, path));
-            }
+            // The user moved on while this was loading.
+            if (_commitFilesRequestToken != token) return;
 
-            if (_commitDetailRequestToken != token) return;
-            SelectedCommitDetail = new CommitDetail(commit, diffs);
+            foreach (var file in files) CommitFiles.Add(file);
+
+            // A single-file commit has nothing to choose, so choose it.
+            if (CommitFiles.Count == 1) SelectedCommitFile = CommitFiles[0];
         }
         catch (Exception ex)
         {
-            if (_commitDetailRequestToken != token) return;
-            SelectedCommitDetail = null;
+            if (_commitFilesRequestToken != token) return;
             ErrorMessage = ex.Message;
         }
         finally
         {
-            if (_commitDetailRequestToken == token) IsLoadingCommitDetail = false;
+            if (_commitFilesRequestToken == token) IsLoadingCommitFiles = false;
+        }
+    }
+
+    private async Task LoadCommitFileDiffAsync(CommitFile? file)
+    {
+        var repoPath = RepositoryPath;
+        var commit = SelectedCommit;
+
+        var token = Guid.NewGuid();
+        _commitFileDiffRequestToken = token;
+
+        if (file == null || commit == null || string.IsNullOrEmpty(repoPath))
+        {
+            CommitFileDiff = null;
+            IsLoadingCommitFileDiff = false;
+            return;
+        }
+
+        IsLoadingCommitFileDiff = true;
+
+        try
+        {
+            var diff = await _gitService.GetCommitFileDiffAsync(repoPath, commit.Hash, file.Path);
+
+            if (_commitFileDiffRequestToken != token) return;
+            CommitFileDiff = diff;
+        }
+        catch (Exception ex)
+        {
+            if (_commitFileDiffRequestToken != token) return;
+            CommitFileDiff = null;
+            ErrorMessage = $"Failed to load diff: {ex.Message}";
+        }
+        finally
+        {
+            if (_commitFileDiffRequestToken == token) IsLoadingCommitFileDiff = false;
         }
     }
 

@@ -2,7 +2,14 @@
     x:Class="GitHalls.App.Views.CommitDetailPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:GitHalls.App.Controls"
+    xmlns:converters="using:GitHalls.App.Converters"
+    xmlns:models="using:GitHalls.Core.Models"
     Background="Transparent">
+
+    <Page.Resources>
+        <converters:StringToBrushConverter x:Key="ColorConverter" />
+    </Page.Resources>
 
     <Grid>
         <!-- Empty / loading states, mirroring the Swift ContentUnavailableView -->
@@ -15,36 +22,96 @@
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
 
-        <ProgressRing x:Name="LoadingRing" IsActive="False" Visibility="Collapsed"
-                      Width="32" Height="32"
-                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <!-- No pane-wide spinner: the header appears with the selection, and the
+             file list says for itself that it is still loading. -->
+        <Grid x:Name="DetailRoot" Visibility="Collapsed" Padding="12,4,12,12" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <ScrollViewer x:Name="DetailScroller" Visibility="Collapsed"
-                      VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
-            <StackPanel Spacing="12" Padding="12,4,12,12">
-
-                <!-- The commit itself reads as one Settings card: title, muted
-                     supporting line, optional body. -->
-                <StackPanel Spacing="6" Padding="16,12" CornerRadius="8"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                    <TextBlock x:Name="SummaryText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock x:Name="AuthorText" Style="{StaticResource GHCaptionTextStyle}" />
-                        <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                        <TextBlock x:Name="DateText" Style="{StaticResource GHCaptionTextStyle}" />
-                        <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                        <TextBlock x:Name="HashText" FontSize="12" FontFamily="Cascadia Mono, Consolas"
-                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                    </StackPanel>
-                    <TextBlock x:Name="BodyText" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
+            <!-- The commit itself reads as one Settings card: title, muted
+                 supporting line, optional body. -->
+            <StackPanel Grid.Row="0" Spacing="6" Padding="16,12" CornerRadius="8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <TextBlock x:Name="SummaryText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock x:Name="AuthorText" Style="{StaticResource GHCaptionTextStyle}" />
+                    <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    <TextBlock x:Name="DateText" Style="{StaticResource GHCaptionTextStyle}" />
+                    <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    <TextBlock x:Name="HashText" FontSize="12" FontFamily="Cascadia Mono, Consolas"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                 </StackPanel>
-
-                <!-- One collapsible section per file, filled in code-behind.
-                     4px apart, the spacing Settings uses inside a card group. -->
-                <StackPanel x:Name="FileSections" Spacing="4" />
+                <TextBlock x:Name="BodyText" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
             </StackPanel>
-        </ScrollViewer>
+
+            <!-- The file list carries no diffs. Picking a row is what fetches one,
+                 which is the whole reason opening a commit is instant. -->
+            <Border Grid.Row="1" Style="{StaticResource GHContentCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="FilesHeaderText" Grid.Row="0" Margin="14,10,14,0"
+                               Style="{StaticResource GHSectionHeaderTextStyle}" />
+
+                    <ListView x:Name="FilesList" Grid.Row="1" MaxHeight="220"
+                              ItemsSource="{x:Bind ViewModel.CommitFiles, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedCommitFile, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              Style="{StaticResource GHListViewStyle}"
+                              ItemContainerStyle="{StaticResource GHListItemStyle}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:CommitFile">
+                                <Grid Padding="0,2" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Background="{x:Bind BadgeColorHex, Converter={StaticResource ColorConverter}}"
+                                            CornerRadius="10" Padding="8,1" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind BadgeLetter}" FontSize="11" FontWeight="SemiBold" Foreground="White" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="{x:Bind Path}">
+                                        <TextBlock Text="{x:Bind FileName}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                        <TextBlock Text="{x:Bind DirectoryPath}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind AdditionsText}" FontSize="12" Foreground="#4CAF50" />
+                                        <TextBlock Text="{x:Bind DeletionsText}" FontSize="12" Foreground="#F44336" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+
+            <!-- One diff at a time: the file that is selected, nothing else. -->
+            <Border Grid.Row="2" Style="{StaticResource GHContentCardStyle}">
+                <Grid>
+                    <controls:DiffTextView x:Name="DiffView" Visibility="Collapsed" />
+
+                    <TextBlock x:Name="DiffPlaceholderText" Text="Select a file to see its changes."
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                    <ProgressRing x:Name="DiffLoadingRing" IsActive="False" Visibility="Collapsed"
+                                  Width="24" Height="24"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Page>

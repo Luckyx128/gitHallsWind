@@ -291,8 +291,10 @@ public sealed partial class MainWindow : Window
                 break;
 
             case nameof(RepositoryViewModel.SelectedCommit):
-            case nameof(RepositoryViewModel.SelectedCommitDetail):
-            case nameof(RepositoryViewModel.IsLoadingCommitDetail):
+            case nameof(RepositoryViewModel.IsLoadingCommitFiles):
+            case nameof(RepositoryViewModel.SelectedCommitFile):
+            case nameof(RepositoryViewModel.CommitFileDiff):
+            case nameof(RepositoryViewModel.IsLoadingCommitFileDiff):
                 (ContentFrame.Content as CommitDetailPage)?.Update();
                 break;
         }

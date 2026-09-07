@@ -50,17 +50,3 @@ public class Commit
         }
     }
 }
-
-
-/// <summary>A commit plus the diff of every file it touched.</summary>
-public class CommitDetail
-{
-    public Commit Commit { get; }
-    public IReadOnlyList<FileDiff> FileDiffs { get; }
-
-    public CommitDetail(Commit commit, IReadOnlyList<FileDiff> fileDiffs)
-    {
-        Commit = commit;
-        FileDiffs = fileDiffs;
-    }
-}
