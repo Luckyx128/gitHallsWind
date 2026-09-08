@@ -392,6 +392,25 @@ public class GitService
     }
 
     /// <summary>
+    /// Pull on a branch that is also ahead. Since git 2.27 a plain "git pull"
+    /// aborts on divergent branches when the reconciliation is not configured
+    /// ("Need to specify how to reconcile divergent branches"), so a merge is
+    /// asked for explicitly — but only when the user set no preference of their
+    /// own, which is theirs to keep.
+    /// </summary>
+    public async Task PullDivergentAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        var configured = await TryReadConfigAsync(repoPath, "pull.rebase", localOnly: false, cancellationToken)
+            ?? await TryReadConfigAsync(repoPath, "pull.ff", localOnly: false, cancellationToken);
+
+        var args = configured == null
+            ? new[] { "pull", "--no-rebase" }
+            : new[] { "pull" };
+
+        await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
     /// Clones into <paramref name="parentDirectory"/>/&lt;repository name&gt; and
     /// returns that path, so the caller opens the directory git actually created.
     /// </summary>
