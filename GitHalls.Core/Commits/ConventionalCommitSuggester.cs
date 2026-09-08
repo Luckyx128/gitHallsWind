@@ -54,7 +54,13 @@ public static class ConventionalCommitSuggester
     private static ConventionalCommitType SuggestFromLineCounts(int additions, int deletions)
     {
         var total = additions + deletions;
-        if (total == 0) return ConventionalCommitType.Chore;
+
+        // No line counts is not an empty change: every categorical case has
+        // already returned above, so what is left is a modification whose size
+        // we simply have not been told — which is what the sidebar asks for
+        // before numstat arrives. A modification of unknown size is a fix, and
+        // calling it a chore said the one thing we know to be wrong.
+        if (total == 0) return ConventionalCommitType.Fix;
 
         if (deletions == 0 || additions > deletions * 3) return ConventionalCommitType.Feat;
         if (total > 20 && additions > 0 && deletions > 0) return ConventionalCommitType.Refactor;
