@@ -14,7 +14,7 @@
     <Grid>
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="B" Modifiers="Control" Invoked="ToggleSidebarAccelerator_Invoked" />
-            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RefreshAccelerator_Invoked" />
+            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="CreatePullRequestAccelerator_Invoked" />
             <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenRepoAccelerator_Invoked" />
         </Grid.KeyboardAccelerators>
 
@@ -38,7 +38,7 @@
         </Grid>
 
         <!-- The MenuBar that used to sit here only duplicated the toolbar
-             (Open/Clone in the Repository button, Merge, Refresh, Fetch, Toggle
+             (Open/Clone in the Repository button, Merge, Fetch, Toggle
              Sidebar). Its keyboard shortcuts are declared on the root Grid. -->
 
         <InfoBar Grid.Row="1" Margin="12,0,12,4" Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
@@ -195,7 +195,10 @@
                     <AppBarToggleButton x:Name="SideBySideToggle" Icon="TwoPage" LabelPosition="Collapsed"
                                         ToolTipService.ToolTip="Side-by-side diff"
                                         Click="SideBySideToggle_Click" />
-                    <AppBarButton Icon="Refresh" LabelPosition="Collapsed" ToolTipService.ToolTip="Refresh (Ctrl+R)" Command="{x:Bind ViewModel.RefreshCommand}" />
+                    <!-- No refresh button: the repository is watched and polled,
+                         and the fetch button covers the one thing a refresh
+                         cannot learn on its own. -->
+                    <AppBarButton Icon="Send" LabelPosition="Collapsed" ToolTipService.ToolTip="Open pull request (Ctrl+R)" Click="CreatePullRequest_Click" />
                     <AppBarButton Icon="Shuffle" LabelPosition="Collapsed" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
                     <AppBarButton Icon="More" LabelPosition="Collapsed" ToolTipService.ToolTip="Repository actions">
                         <AppBarButton.Flyout>

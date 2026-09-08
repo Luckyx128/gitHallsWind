@@ -357,6 +357,38 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Opens a pull request for the current branch: the sheet collects title,
+    /// description and base, the view model pushes and then creates it, and the
+    /// URL that comes back is opened here.
+    /// </summary>
+    private async void CreatePullRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(ViewModel.RepositoryPath) || ViewModel.CurrentBranch == null) return;
+
+        var sheet = new CreatePullRequestSheet();
+
+        var dialog = new ContentDialog
+        {
+            Title = "Create Pull Request",
+            Content = sheet,
+            PrimaryButtonText = "Create Pull Request",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            IsPrimaryButtonEnabled = false,
+            XamlRoot = Content.XamlRoot
+        };
+
+        // A pull request with no title is not one GitHub will take.
+        sheet.IsValidChanged += (_, valid) => dialog.IsPrimaryButtonEnabled = valid;
+        await sheet.LoadAsync(ViewModel);
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        var url = await ViewModel.CreatePullRequestAsync(sheet.Title, sheet.Description, sheet.BaseBranch);
+        if (!string.IsNullOrEmpty(url)) _platformActions.OpenUrl(url);
+    }
+
+    /// <summary>
     /// Hands the picker the current state each time it opens, and closes the
     /// flyout as soon as it acts.
     ///
@@ -393,10 +425,10 @@ public sealed partial class MainWindow : Window
         ToggleSidebar_Click(sender, new RoutedEventArgs());
     }
 
-    private void RefreshAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    private void CreatePullRequestAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        ViewModel.RefreshCommand.Execute(null);
+        CreatePullRequest_Click(sender, new RoutedEventArgs());
     }
 
     private void OpenRepoAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

@@ -21,6 +21,12 @@ public class PlatformActions
         return folder?.Path;
     }
 
+    /// <summary>Hands a URL to the default browser. UseShellExecute is what makes it a browser and not a process.</summary>
+    public void OpenUrl(string url)
+    {
+        Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+    }
+
     public void RevealInExplorer(string path)
     {
         Process.Start("explorer.exe", $"/select,\"{path}\"");

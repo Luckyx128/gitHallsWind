@@ -130,13 +130,62 @@ public class GitService
         return null;
     }
 
+    /// <summary>What <see cref="CommitLogParser"/> reads back — the two must change together.</summary>
+    private const string LogFormat = "%H%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
+
     public async Task<IReadOnlyList<Commit>> GetLogAsync(string repoPath, int maxCount = 50, CancellationToken cancellationToken = default)
     {
-        var format = "%H%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
-        var args = new[] { "log", $"-n {maxCount}", $"--pretty=format:{format}" };
+        var args = new[] { "log", $"-n {maxCount}", $"--pretty=format:{LogFormat}" };
 
         var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
         return _logParser.Parse(result.StandardOutput);
+    }
+
+    /// <summary>
+    /// Commits HEAD has and <paramref name="baseRef"/> does not, newest first —
+    /// exactly what a pull request would carry.
+    ///
+    /// An unknown ref is a normal answer here (a base branch this clone has
+    /// never fetched), not a failure: nothing to compare means nothing ahead.
+    /// </summary>
+    public async Task<IReadOnlyList<Commit>> GetCommitsAheadAsync(string repoPath, string baseRef, int maxCount = 50, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _runner.RunAsync(
+                repoPath,
+                new[] { "log", $"-n {maxCount}", $"--pretty=format:{LogFormat}", $"{baseRef}..HEAD" },
+                cancellationToken: cancellationToken);
+
+            return _logParser.Parse(result.StandardOutput);
+        }
+        catch (GitException)
+        {
+            return Array.Empty<Commit>();
+        }
+    }
+
+    /// <summary>
+    /// The branch a pull request goes into when the user picks none:
+    /// "origin/HEAD", which a clone points at the remote's default branch.
+    /// Null when it was never set — an old clone, or a repository with no remote.
+    /// </summary>
+    public async Task<string?> GetDefaultBaseRefAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _runner.RunAsync(
+                repoPath,
+                new[] { "symbolic-ref", "--short", "refs/remotes/origin/HEAD" },
+                cancellationToken: cancellationToken);
+
+            var value = result.StandardOutput.Trim();
+            return value.Length == 0 ? null : value;
+        }
+        catch (GitException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

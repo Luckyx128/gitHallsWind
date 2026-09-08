@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using GitHalls.App.Services;
 using GitHalls.Core.Commits;
 using GitHalls.Core.Git;
+using GitHalls.Core.GitHub;
 using GitHalls.Core.Models;
 using Microsoft.UI.Dispatching;
 using System.Collections.ObjectModel;
@@ -21,6 +22,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private static readonly TimeSpan MinFetchInterval = TimeSpan.FromMinutes(2);
 
     private readonly GitService _gitService;
+    private readonly GitHubCli _gitHubCli = new();
     private readonly SettingsStore _settingsStore;
     private readonly DispatcherQueue _dispatcher;
 
@@ -483,7 +485,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         Save();
     }
 
-    [RelayCommand]
+    /// <summary>
+    /// Not a command any more: the watcher, the poll and every git operation
+    /// call it, and the toolbar has no refresh button to bind it to.
+    /// </summary>
     public async Task RefreshAsync()
     {
         if (string.IsNullOrEmpty(RepositoryPath)) return;
@@ -908,6 +913,84 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private static bool IsRejectedForNewRemoteWork(GitException ex) =>
         ex.RawError.Contains("fetch first", StringComparison.OrdinalIgnoreCase)
         || ex.RawError.Contains("non-fast-forward", StringComparison.OrdinalIgnoreCase);
+
+    // MARK: - Pull request
+
+    /// <summary>
+    /// The "origin" URL, read on demand. Nothing on screen shows it, so it is
+    /// not worth a git process on every refresh.
+    /// </summary>
+    public Task<string?> GetRemoteUrlAsync() => string.IsNullOrEmpty(RepositoryPath)
+        ? Task.FromResult<string?>(null)
+        : _gitService.GetRemoteUrlAsync(RepositoryPath);
+
+    /// <summary>Remote branches, short names only — what a pull request can be opened against.</summary>
+    public IReadOnlyList<string> RemoteBranchNames => Branches
+        .Where(b => b.IsRemote)
+        .Select(b => Branch.RemoteShortName(b.Name))
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    /// <summary>
+    /// The title and description a new pull request opens with: one commit
+    /// ahead of the base means that commit says everything, several mean only
+    /// the branch name covers all of them.
+    ///
+    /// Read at the moment the dialog opens rather than kept on the view model:
+    /// it costs a git process, and nothing else on screen needs the answer.
+    /// </summary>
+    public async Task<PullRequestDraft> SuggestPullRequestAsync(string? baseBranch)
+    {
+        var path = RepositoryPath;
+        var head = CurrentBranch?.Name;
+        if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(head)) return PullRequestDraft.Empty;
+
+        // The picker shows the branch as GitHub names it ("main"); the commits
+        // are counted against the copy this clone has of it.
+        var baseRef = string.IsNullOrWhiteSpace(baseBranch)
+            ? await _gitService.GetDefaultBaseRefAsync(path)
+            : $"origin/{baseBranch}";
+
+        IReadOnlyList<Commit> commits = Array.Empty<Commit>();
+        if (baseRef != null) commits = await _gitService.GetCommitsAheadAsync(path, baseRef);
+
+        return PullRequestDraft.From(commits, head);
+    }
+
+    /// <summary>
+    /// Pushes the current branch and opens a pull request for it, returning the
+    /// URL to show — the caller opens it, since a browser is the shell's job.
+    ///
+    /// The push is not optional: GitHub has no page for a branch it has never
+    /// seen. With `gh` installed the PR is created outright; without it, the
+    /// prefilled GitHub page is the fallback and the user presses the button.
+    /// Port of RepositoryViewModel.createPullRequest.
+    /// </summary>
+    public async Task<string?> CreatePullRequestAsync(string title, string description, string? baseBranch)
+    {
+        var head = CurrentBranch?.Name;
+        if (string.IsNullOrEmpty(head)) return null;
+
+        string? url = null;
+        await RunGitAsync(async path =>
+        {
+            if (HasUpstream) await _gitService.PushAsync(path);
+            else await _gitService.PushPublishAsync(path);
+
+            if (await _gitHubCli.IsAvailableAsync())
+            {
+                url = await _gitHubCli.CreatePullRequestAsync(path, title, description, baseBranch);
+                return;
+            }
+
+            var remote = await _gitService.GetRemoteUrlAsync(path);
+            url = PullRequestUrl.ForBrowser(remote, head, baseBranch, title, description)
+                ?? throw new GitException("This repository has no GitHub remote to open a pull request on.", remote ?? string.Empty);
+        });
+
+        return HasError ? null : url;
+    }
 
     /// <summary>
     /// The one action the sync button performs, chosen from the current state.
