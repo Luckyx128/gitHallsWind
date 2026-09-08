@@ -30,12 +30,16 @@ Core, it belongs in Core with a test.
   A slow answer for a file, commit or query the user has moved on from must not
   overwrite what is on screen.
 - **`RepositoryViewModel` and `JiraViewModel` are separate on purpose.** Jira is
-  not git. They meet in exactly one place: `IssueDetailPage`, which holds both
-  and asks the repository to create a branch.
+  not git. They meet in exactly one place: `IssueWindow`, which holds both and
+  asks the repository to create a branch.
 - **Pages are told to `Update()` by `MainWindow`'s `PropertyChanged` switch.**
   Adding a view-model property that a pane renders means adding a case there.
 - **The sidebar and the detail pane move together.** Changes pairs with the file
-  diff, History with the commit detail, Kanban with the issue detail.
+  diff, History with the commit detail, Kanban's query list with the board.
+- **Secondary windows, not dialogs, for things that stay open**: Settings and
+  each issue (`IssueWindow`, one per key, tracked in `MainWindow._issueWindows`
+  so a second click activates instead of duplicating). They are told about
+  repository changes by the same `PropertyChanged` switch.
 
 ## git
 
@@ -101,9 +105,20 @@ Windows 11 Settings, not a toolbar app. Shared styles live in
 - `POST /rest/api/3/search/jql`, and only the fields the sidebar shows.
 - Jira timestamps carry an offset with no colon (`...-0300`), which no standard
   .NET parse accepts — `JiraTimestamp` normalizes it first.
-- The board is JQL-driven, grouped by status with "done" columns last. Status
-  names are project-specific; `statusCategory` (`new` / `indeterminate` / `done`)
-  is the only field that means the same thing everywhere.
+- The board runs one `JiraQuery` at a time: presets from `JiraQueryPresets`
+  (code, never saved) plus the user's own in `AppSettings.JiraCustomQueries`.
+  The default is the active sprint (`sprint in openSprints() ORDER BY Rank`).
+- Columns are `JiraIssueGrouping.ByStatus`: ordered by `statusCategory`
+  (`new` → `indeterminate` → `done`), and within a category in the order Jira
+  returned. Status names are project-specific; the category is the only field
+  that means the same thing everywhere. The text filter is client-side
+  (`Filter`), it never re-queries.
+- Search asks only for card fields; `GetIssueAsync` adds description, people,
+  dates and labels when a window opens. `Description == null` means "not
+  fetched", `""` means "Jira has none" — the window shows them differently.
+- Descriptions arrive as Atlassian Document Format (a JSON node tree), not
+  text. `JiraAdf.ToPlainText` flattens it; unknown node types still render
+  their children. Extend it there, with a test.
 
 ## Conventions
 

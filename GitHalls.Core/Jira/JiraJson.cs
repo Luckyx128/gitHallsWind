@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace GitHalls.Core.Jira;
@@ -36,6 +37,22 @@ internal sealed class JiraFieldsDto
 
     public JiraNamedDto? Priority { get; set; }
     public string? Updated { get; set; }
+    public string? Created { get; set; }
+    public JiraUserDto? Assignee { get; set; }
+    public JiraUserDto? Reporter { get; set; }
+    public List<string>? Labels { get; set; }
+
+    /// <summary>
+    /// Atlassian Document Format: a JSON tree, not a string. Kept raw here and
+    /// flattened by <see cref="JiraAdf"/> — the wire shape has dozens of node
+    /// types and no schema worth typing.
+    /// </summary>
+    public JsonElement? Description { get; set; }
+}
+
+internal sealed class JiraUserDto
+{
+    public string? DisplayName { get; set; }
 }
 
 internal sealed class JiraStatusDto
@@ -69,6 +86,7 @@ internal sealed class JiraErrorResponse
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(JiraSearchRequest))]
 [JsonSerializable(typeof(JiraSearchResponse))]
+[JsonSerializable(typeof(JiraIssueDto))]
 [JsonSerializable(typeof(JiraMyselfResponse))]
 [JsonSerializable(typeof(JiraErrorResponse))]
 internal partial class JiraJsonContext : JsonSerializerContext

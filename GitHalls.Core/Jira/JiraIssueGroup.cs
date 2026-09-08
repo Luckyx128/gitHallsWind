@@ -22,15 +22,33 @@ public sealed class JiraIssueGroup
 }
 
 /// <summary>
-/// Groups a flat JQL result by status.
+/// Groups a flat JQL result by status, in board order.
 ///
-/// The order is the order Jira returned — a project's own workflow order, which
-/// no sorting here could guess — with the single exception that "done" columns
-/// sink to the bottom. Statuses are project-specific strings; the category is
-/// the only field that means the same thing everywhere.
+/// Columns run left to right the way work flows: "new" statuses, then the ones
+/// in progress, then "done". Within a category the order is the order Jira
+/// returned — a project's own workflow order, which no sorting here could
+/// guess. Statuses are project-specific strings; the category is the only
+/// field that means the same thing everywhere.
 /// </summary>
 public static class JiraIssueGrouping
 {
+    /// <summary>Keeps every column, with only the issues that match the text. An empty column still holds its place on the board.</summary>
+    public static IReadOnlyList<JiraIssueGroup> Filter(IReadOnlyList<JiraIssueGroup> groups, string? filter)
+    {
+        if (string.IsNullOrWhiteSpace(filter)) return groups;
+
+        return groups
+            .Select(g => new JiraIssueGroup(g.Status, g.Category, g.Issues.Where(i => i.Matches(filter)).ToList()))
+            .ToList();
+    }
+
+    private static int CategoryRank(string category) => category switch
+    {
+        "new" => 0,
+        "done" => 2,
+        _ => 1
+    };
+
     public static IReadOnlyList<JiraIssueGroup> ByStatus(IEnumerable<JiraIssue> issues)
     {
         var order = new List<string>();
@@ -50,10 +68,10 @@ public static class JiraIssueGrouping
             bucket.Add(issue);
         }
 
-        // OrderBy is stable, so everything that isn't "done" keeps the order it
-        // arrived in.
+        // OrderBy is stable, so within a category the columns keep the order
+        // they arrived in.
         return order
-            .OrderBy(status => string.Equals(categoryOf[status], "done", StringComparison.Ordinal))
+            .OrderBy(status => CategoryRank(categoryOf[status]))
             .Select(status => new JiraIssueGroup(status, categoryOf[status], byStatus[status]))
             .ToList();
     }

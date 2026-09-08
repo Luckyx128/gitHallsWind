@@ -178,6 +178,65 @@ public class JiraClientTests
     }
 
     [Fact]
+    public async Task GetIssueAsync_ReadsTheDetailTheWindowShows()
+    {
+        const string body = """
+        {
+          "key": "SWEB-6832",
+          "fields": {
+            "summary": "Kanban do WhatsApp",
+            "status": { "name": "Done", "statusCategory": { "key": "done" } },
+            "issuetype": { "name": "Story" },
+            "priority": { "name": "High" },
+            "updated": "2026-08-07T14:02:11.123-0300",
+            "created": "2026-08-01T09:00:00.000-0300",
+            "assignee": { "displayName": "Erikson" },
+            "reporter": { "displayName": "Ana" },
+            "labels": ["mobile", "whatsapp"],
+            "description": {
+              "type": "doc", "version": 1,
+              "content": [
+                { "type": "paragraph", "content": [ { "type": "text", "text": "First line." } ] },
+                { "type": "bulletList", "content": [
+                  { "type": "listItem", "content": [ { "type": "paragraph", "content": [ { "type": "text", "text": "one" } ] } ] }
+                ] }
+              ]
+            }
+          }
+        }
+        """;
+
+        var (client, handler) = ClientFor(HttpStatusCode.OK, body);
+
+        var issue = await client.GetIssueAsync("SWEB-6832");
+
+        Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/SWEB-6832", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("description", handler.LastRequest.RequestUri.Query);
+
+        Assert.Equal("Erikson", issue.AssigneeName);
+        Assert.Equal("Ana", issue.ReporterName);
+        Assert.Equal(new[] { "mobile", "whatsapp" }, issue.Labels);
+        Assert.Equal(1, issue.Created.Day);
+        Assert.True(issue.IsDone);
+        Assert.Equal("First line.\n• one", issue.Description);
+    }
+
+    [Fact]
+    public async Task SearchAsync_LeavesTheDescriptionUnknownRatherThanEmpty()
+    {
+        // The search never asks for it; "no description" is only true after a fetch.
+        var (client, handler) = ClientFor(HttpStatusCode.OK, """{"issues":[{"key":"ABC-1","fields":{"assignee":{"displayName":"Bo"}}}]}""");
+
+        var issue = Assert.Single(await client.SearchAsync("x"));
+
+        Assert.Null(issue.Description);
+        Assert.Equal("Bo", issue.AssigneeName);
+        Assert.Contains("\"assignee\"", handler.LastBody);
+        Assert.DoesNotContain("description", handler.LastBody);
+    }
+
+    [Fact]
     public void BrowseUrl_PointsAtTheIssueOnTheSite()
     {
         var client = new JiraClient(Credentials);
