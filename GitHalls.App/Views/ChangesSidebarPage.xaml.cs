@@ -1,5 +1,6 @@
 using GitHalls.App.ViewModels;
 using GitHalls.Core.Commits;
+using GitHalls.Core.Git;
 using GitHalls.Core.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -160,6 +161,54 @@ public sealed partial class ChangesSidebarPage : Page
         DiscardMenuItem.Text = _contextChange == null
             ? "Discard Changes..."
             : $"Discard Changes in {_contextChange.FileName}...";
+
+        var conflicted = _contextChange is
+        {
+            IndexStatus: FileChangeStatus.Unmerged
+        } or
+        {
+            WorkTreeStatus: FileChangeStatus.Unmerged
+        };
+
+        ResolveMenuItem.Visibility = conflicted ? Visibility.Visible : Visibility.Collapsed;
+
+        BuildOpenInMenu();
+    }
+
+    /// <summary>
+    /// Rebuilt each time the menu opens rather than once: an editor can be
+    /// installed while the window is open, and the list is a handful of items.
+    /// </summary>
+    private void BuildOpenInMenu()
+    {
+        OpenInMenuItem.Items.Clear();
+
+        var editors = ExternalEditors.Installed();
+        OpenInMenuItem.IsEnabled = _contextChange != null && editors.Count > 0;
+
+        if (editors.Count == 0)
+        {
+            OpenInMenuItem.Items.Add(new MenuFlyoutItem { Text = "No editor found", IsEnabled = false });
+            return;
+        }
+
+        foreach (var editor in editors)
+        {
+            var item = new MenuFlyoutItem { Text = editor.Name };
+            var change = _contextChange;
+            item.Click += (_, _) =>
+            {
+                if (change != null) ViewModel.OpenInEditor(change, editor);
+            };
+            OpenInMenuItem.Items.Add(item);
+        }
+    }
+
+    private async void ResolveMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_contextChange == null) return;
+
+        await ViewModel.MarkResolvedAsync(_contextChange);
     }
 
     private async void DiscardMenuItem_Click(object sender, RoutedEventArgs e)

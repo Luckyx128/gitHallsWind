@@ -15,6 +15,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -43,13 +44,25 @@
                     ToolTipService.ToolTip="Discard changes in the selected file" />
         </Grid>
 
-        <ListView x:Name="ChangesList" Grid.Row="1" ItemsSource="{x:Bind ViewModel.Changes, Mode=OneWay}"
+        <!-- Conflicts stop everything else: nothing can be committed until they
+             are settled, so the list says so above itself rather than leaving
+             them to be spotted among ordinary changes. -->
+        <InfoBar x:Name="ConflictBar" Grid.Row="1" Margin="12,0,12,6"
+                 Severity="Warning" IsClosable="False"
+                 IsOpen="{x:Bind ViewModel.HasConflicts, Mode=OneWay}"
+                 Message="{x:Bind ViewModel.ConflictSummary, Mode=OneWay}" />
+
+        <ListView x:Name="ChangesList" Grid.Row="2" ItemsSource="{x:Bind ViewModel.Changes, Mode=OneWay}"
                   SelectedItem="{x:Bind ViewModel.SelectedChange, Mode=TwoWay}"
                   SelectionMode="Single"
                   Style="{StaticResource GHListViewStyle}"
                   ItemContainerStyle="{StaticResource GHListItemStyle}">
             <ListView.ContextFlyout>
                 <MenuFlyout Opening="ChangesContextFlyout_Opening">
+                    <!-- Resolving is what a conflicted file needs first, so it leads. -->
+                    <MenuFlyoutItem x:Name="ResolveMenuItem" Text="Mark as Resolved"
+                                    Visibility="Collapsed" Click="ResolveMenuItem_Click" />
+                    <MenuFlyoutSubItem x:Name="OpenInMenuItem" Text="Open in" />
                     <MenuFlyoutItem x:Name="DiscardMenuItem" Text="Discard Changes..." Click="DiscardMenuItem_Click" />
                 </MenuFlyout>
             </ListView.ContextFlyout>
@@ -83,7 +96,7 @@
         </ListView>
 
         <!-- The composer is a card, not a footer fenced off by a rule. -->
-        <StackPanel Grid.Row="2" Style="{StaticResource GHCardPanelStyle}"
+        <StackPanel Grid.Row="3" Style="{StaticResource GHCardPanelStyle}"
                     Spacing="8" Margin="8,4,8,8" Padding="12">
 
             <!-- Conventional Commits: the type and scope build the "type(scope): "

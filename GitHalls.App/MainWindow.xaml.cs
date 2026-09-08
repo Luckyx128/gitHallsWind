@@ -193,6 +193,8 @@ public sealed partial class MainWindow : Window
 
     // MARK: - Settings
 
+    private void StashAndPull_Click(object sender, RoutedEventArgs e) => _ = ViewModel.PullWithStashAsync();
+
     private void OpenSettings_Click(object sender, RoutedEventArgs e) => OpenSettings();
 
     private void OpenSettings()
@@ -517,6 +519,12 @@ public sealed partial class MainWindow : Window
             case nameof(RepositoryViewModel.SelectedCommit):
             case nameof(RepositoryViewModel.IsLoadingCommitFiles):
             case nameof(RepositoryViewModel.SelectedCommitFile):
+            case nameof(RepositoryViewModel.PullBlockedByLocalChanges):
+                StashAndPullButton.Visibility = ViewModel.PullBlockedByLocalChanges
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                break;
+
             case nameof(RepositoryViewModel.CurrentDiffPreview):
                 (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff, ViewModel.CurrentDiffPreview);
                 break;

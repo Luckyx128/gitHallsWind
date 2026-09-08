@@ -43,7 +43,14 @@
 
         <InfoBar Grid.Row="1" Margin="12,0,12,4" Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
                  Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-                 CloseButtonClick="ErrorBar_CloseButtonClick" />
+                 CloseButtonClick="ErrorBar_CloseButtonClick">
+            <!-- git refuses this pull rather than overwriting work in progress.
+                 It can still be done: set the changes aside and put them back. -->
+            <InfoBar.ActionButton>
+                <Button x:Name="StashAndPullButton" Content="Stash, Pull and Restore"
+                        Visibility="Collapsed" Click="StashAndPull_Click" />
+            </InfoBar.ActionButton>
+        </InfoBar>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

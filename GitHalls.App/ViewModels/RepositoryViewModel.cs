@@ -8,6 +8,7 @@ using GitHalls.Core.GitHub;
 using GitHalls.Core.Models;
 using Microsoft.UI.Dispatching;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace GitHalls.App.ViewModels;
 
@@ -47,7 +48,11 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public void ClearError() => ErrorMessage = null;
+    public void ClearError()
+    {
+        ErrorMessage = null;
+        PullBlockedByLocalChanges = false;
+    }
 
     public ObservableCollection<FileChange> Changes { get; } = new();
     public ObservableCollection<Commit> Commits { get; } = new();
@@ -95,6 +100,13 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private BinaryFileContents? _commitFilePreview;
+
+    /// <summary>
+    /// git refused a pull because it would have written over uncommitted work.
+    /// The error bar turns this into an offer rather than a dead end.
+    /// </summary>
+    [ObservableProperty]
+    private bool _pullBlockedByLocalChanges;
 
     /// <summary>Show diffs side by side rather than unified. Persisted.</summary>
     [ObservableProperty]
@@ -632,6 +644,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanCommit));
         OnPropertyChanged(nameof(StagedChanges));
         OnPropertyChanged(nameof(HasStagedChanges));
+        OnPropertyChanged(nameof(ConflictedChanges));
+        OnPropertyChanged(nameof(HasConflicts));
+        OnPropertyChanged(nameof(ConflictSummary));
         CommitCommand.NotifyCanExecuteChanged();
     }
 
@@ -1054,9 +1069,21 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
                 break;
 
             case SyncAction.PullThenPush:
+                PullBlockedByLocalChanges = false;
                 await RunGitAsync(async path =>
                 {
-                    await _gitService.PullDivergentAsync(path);
+                    try
+                    {
+                        await _gitService.PullDivergentAsync(path);
+                    }
+                    catch (GitException ex) when (PullDiagnostics.IsBlockedByLocalChanges(ex.RawError))
+                    {
+                        // Same offer as a plain pull: the sync button is where
+                        // this is most often hit.
+                        PullBlockedByLocalChanges = true;
+                        throw;
+                    }
+
                     await _gitService.PushAsync(path);
                 });
                 break;
@@ -1111,7 +1138,81 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public async Task PullAsync()
     {
-        await RunGitAsync(path => _gitService.PullAsync(path));
+        PullBlockedByLocalChanges = false;
+
+        await RunGitAsync(async path =>
+        {
+            try
+            {
+                await _gitService.PullAsync(path);
+            }
+            catch (GitException ex) when (PullDiagnostics.IsBlockedByLocalChanges(ex.RawError))
+            {
+                // Not a dead end: the changes can be set aside for the pull and
+                // put back. The error bar turns this flag into that offer.
+                PullBlockedByLocalChanges = true;
+                throw;
+            }
+        });
+    }
+
+    /// <summary>The offer a blocked pull turns into: stash, pull, restore.</summary>
+    [RelayCommand]
+    public async Task PullWithStashAsync()
+    {
+        PullBlockedByLocalChanges = false;
+
+        var conflicted = false;
+        await RunGitAsync(async path => conflicted = await _gitService.PullAutostashAsync(path));
+
+        // Not an error — the pull worked. But saying nothing would leave the
+        // user in a conflicted tree with a stash nobody mentioned.
+        if (conflicted && !HasError) ErrorMessage = "Pulled, but your local changes could not be put back cleanly.\n\nThey are safe in the stash: resolve the conflicts in the affected files, then drop the leftover stash entry.";
+    }
+
+    // MARK: - Conflicts
+
+    /// <summary>
+    /// Files git could not merge on its own. Nothing else can be committed
+    /// until these are dealt with, so they are worth calling out rather than
+    /// leaving in the list looking like ordinary changes.
+    /// </summary>
+    public IReadOnlyList<FileChange> ConflictedChanges =>
+        Changes.Where(c => c.IndexStatus == FileChangeStatus.Unmerged || c.WorkTreeStatus == FileChangeStatus.Unmerged).ToList();
+
+    public bool HasConflicts => ConflictedChanges.Count > 0;
+
+    public string ConflictSummary => ConflictedChanges.Count == 1
+        ? "1 file has conflicts. Resolve it, then mark it resolved."
+        : $"{ConflictedChanges.Count} files have conflicts. Resolve them, then mark them resolved.";
+
+    /// <summary>
+    /// Tells git the file is settled. Resolving <em>is</em> staging — there is
+    /// no separate "resolved" state, which is why this reuses stage.
+    /// </summary>
+    public async Task MarkResolvedAsync(FileChange change)
+    {
+        await RunGitAsync(path => _gitService.StageAsync(path, change.Path));
+    }
+
+    public void OpenInEditor(FileChange change, ExternalEditor editor)
+    {
+        var repoPath = RepositoryPath;
+        if (string.IsNullOrEmpty(repoPath)) return;
+
+        var executable = ExternalEditors.Locate(editor);
+        if (executable == null) return;
+
+        var full = Path.Combine(repoPath, change.Path.Replace('/', Path.DirectorySeparatorChar));
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(executable, full) { UseShellExecute = false });
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Could not open {editor.Name}: {ex.Message}";
+        }
     }
 
     /// <summary>Runs a git operation, then refreshes — with uniform busy and error handling.</summary>

@@ -481,14 +481,42 @@ public class GitService
     /// </summary>
     public async Task PullDivergentAsync(string repoPath, CancellationToken cancellationToken = default)
     {
+        var args = new List<string> { "pull" };
+        args.AddRange(await ReconcileArgumentsAsync(repoPath, cancellationToken));
+
+        await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the working tree aside for the pull and puts it back afterwards,
+    /// which is what git refuses to do on its own when the merge would write
+    /// over uncommitted work.
+    /// </summary>
+    /// <returns>
+    /// True when the pull landed but those changes could not be put back
+    /// cleanly. git reports that on stderr <em>while exiting 0</em>, so it has
+    /// to be read out of the output rather than raised as an error.
+    /// </returns>
+    public async Task<bool> PullAutostashAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        var args = new List<string> { "pull", "--autostash" };
+        args.AddRange(await ReconcileArgumentsAsync(repoPath, cancellationToken));
+
+        var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+
+        return PullDiagnostics.AutostashConflicted(result.StandardError + result.StandardOutput);
+    }
+
+    /// <summary>
+    /// "--no-rebase", but only when the user configured no preference of their
+    /// own. Without it a divergent pull aborts asking to be told how.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> ReconcileArgumentsAsync(string repoPath, CancellationToken cancellationToken)
+    {
         var configured = await TryReadConfigAsync(repoPath, "pull.rebase", localOnly: false, cancellationToken)
             ?? await TryReadConfigAsync(repoPath, "pull.ff", localOnly: false, cancellationToken);
 
-        var args = configured == null
-            ? new[] { "pull", "--no-rebase" }
-            : new[] { "pull" };
-
-        await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+        return configured == null ? new[] { "--no-rebase" } : Array.Empty<string>();
     }
 
     /// <summary>
