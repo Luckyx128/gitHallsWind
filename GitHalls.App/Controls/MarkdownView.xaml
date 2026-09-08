@@ -1,0 +1,9 @@
+<UserControl
+    x:Class="GitHalls.App.Controls.MarkdownView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Blocks are built in code for the same reason the Kanban columns are:
+         a handful of shapes read better as a method than as nested templates. -->
+    <StackPanel x:Name="BlocksPanel" Spacing="10" />
+</UserControl>

@@ -26,6 +26,19 @@
             <controls:DiffViewer x:Name="DiffView" />
         </Border>
 
+        <!-- Nothing selected is the moment the repository is opened and the
+             moment a branch is switched into — which is exactly when its README
+             is worth reading. -->
+        <Border x:Name="ReadmeCard" Grid.Row="1" Style="{StaticResource GHContentCardStyle}"
+                Margin="12,0,12,12" Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock x:Name="ReadmeNameText" Style="{StaticResource GHCaptionTextStyle}" />
+                    <controls:MarkdownView x:Name="ReadmeView" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
         <TextBlock x:Name="EmptyText" Grid.Row="1"
                    Text="Select a file to see its changes."
                    HorizontalAlignment="Center" VerticalAlignment="Center"

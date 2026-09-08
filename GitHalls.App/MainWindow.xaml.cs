@@ -117,6 +117,7 @@ public sealed partial class MainWindow : Window
         {
             SidebarFrame.Navigate(typeof(ChangesSidebarPage), ViewModel, suppressInfo);
             ContentFrame.Navigate(typeof(DiffPage), null, suppressInfo);
+            (ContentFrame.Content as DiffPage)?.SetViewModel(ViewModel);
             (ContentFrame.Content as DiffPage)?.SetSideBySide(ViewModel.IsSideBySideDiff);
             (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff, ViewModel.CurrentDiffPreview);
         }
@@ -519,6 +520,12 @@ public sealed partial class MainWindow : Window
             case nameof(RepositoryViewModel.SelectedCommit):
             case nameof(RepositoryViewModel.IsLoadingCommitFiles):
             case nameof(RepositoryViewModel.SelectedCommitFile):
+            case nameof(RepositoryViewModel.Readme):
+                // Repainted through the same call as the diff: the README only
+                // shows where the diff is absent, and one path decides both.
+                (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff, ViewModel.CurrentDiffPreview);
+                break;
+
             case nameof(RepositoryViewModel.PullBlockedByLocalChanges):
                 StashAndPullButton.Visibility = ViewModel.PullBlockedByLocalChanges
                     ? Visibility.Visible

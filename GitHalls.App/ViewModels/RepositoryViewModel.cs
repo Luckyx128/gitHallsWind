@@ -5,6 +5,7 @@ using GitHalls.Core.Commits;
 using GitHalls.Core.Diff;
 using GitHalls.Core.Git;
 using GitHalls.Core.GitHub;
+using GitHalls.Core.Markdown;
 using GitHalls.Core.Models;
 using Microsoft.UI.Dispatching;
 using System.Collections.ObjectModel;
@@ -107,6 +108,29 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     /// </summary>
     [ObservableProperty]
     private bool _pullBlockedByLocalChanges;
+
+    /// <summary>
+    /// The repository's README, as blocks to lay out.
+    ///
+    /// Read from the working tree, so it is always this branch's own copy:
+    /// checking out another branch rewrites the file on disk, and this re-reads
+    /// it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReadme))]
+    private IReadOnlyList<MarkdownBlock> _readme = Array.Empty<MarkdownBlock>();
+
+    [ObservableProperty]
+    private string? _readmeFileName;
+
+    public bool HasReadme => Readme.Count > 0;
+
+    /// <summary>
+    /// Repository and branch the README on screen was read for. A status
+    /// refresh happens on every window activation, and re-reading a file that
+    /// cannot have changed is work for nothing.
+    /// </summary>
+    private string? _readmeKey;
 
     /// <summary>Show diffs side by side rather than unified. Persisted.</summary>
     [ObservableProperty]
@@ -432,6 +456,46 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         return new BinaryFileContents(filePath, before, after);
     }
 
+    // MARK: - Readme
+
+    /// <summary>
+    /// Longest README worth laying out. Past this it is a data file that
+    /// happens to be called README, and rendering it would only hang the pane.
+    /// </summary>
+    private const int ReadmeSizeLimit = 512 * 1024;
+
+    private async Task LoadReadmeIfNeededAsync(string repoPath, string? branch)
+    {
+        var key = $"{repoPath}#{branch}";
+        if (_readmeKey == key) return;
+        _readmeKey = key;
+
+        try
+        {
+            var names = Directory.EnumerateFiles(repoPath).Select(Path.GetFileName).OfType<string>().ToList();
+            var name = ReadmeFinder.Pick(names);
+
+            if (name != null)
+            {
+                var full = Path.Combine(repoPath, name);
+                if (new FileInfo(full).Length <= ReadmeSizeLimit)
+                {
+                    var text = await File.ReadAllTextAsync(full);
+                    ReadmeFileName = name;
+                    Readme = MarkdownParser.Parse(text);
+                    return;
+                }
+            }
+        }
+        catch (IOException)
+        {
+            // A README that cannot be read is the same as none for this pane.
+        }
+
+        ReadmeFileName = null;
+        Readme = Array.Empty<MarkdownBlock>();
+    }
+
     private const int MaxRecentRepositories = 10;
     private const int MaxRecentBranches = 5;
 
@@ -585,6 +649,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         var branches = await _gitService.GetBranchesAsync(repoPath);
         MergeBranches(branches);
+
+        // Hooked here rather than on open: this runs after a checkout, a pull
+        // and a merge too, which is every way the branch's README can change.
+        await LoadReadmeIfNeededAsync(repoPath, CurrentBranch?.Name);
 
         CurrentAuthor = await _gitService.GetAuthorAsync(repoPath);
         HasLocalIdentityOverride = await _gitService.HasLocalIdentityAsync(repoPath);
