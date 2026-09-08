@@ -2,14 +2,16 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace GitHalls.Core.Jira;
 
 /// <summary>
-/// The three Jira Cloud calls this app makes: who am I, which issues match a
-/// JQL query, and everything about one issue. Nothing here caches or retries —
-/// the view model decides when to ask, and a rate limit comes back as an error
-/// the user can read.
+/// The Jira Cloud calls this app makes: who am I, which issues match a JQL
+/// query, everything about one issue, which moves an issue can make, and the
+/// two writes — move it, assign it. Nothing here caches or retries — the view
+/// model decides when to ask, and a rate limit comes back as an error the user
+/// can read.
 /// </summary>
 public sealed class JiraClient
 {
@@ -57,10 +59,8 @@ public sealed class JiraClient
     public async Task<IReadOnlyList<JiraIssue>> SearchAsync(string jql, int limit = 50, CancellationToken cancellationToken = default)
     {
         var request = Request(HttpMethod.Post, SearchPath);
-        var payload = JsonSerializer.Serialize(
-            new JiraSearchRequest { Jql = jql, Fields = CardFields, MaxResults = limit },
-            JiraJsonContext.Default.JiraSearchRequest);
-        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+        SetJsonBody(request, new JiraSearchRequest { Jql = jql, Fields = CardFields, MaxResults = limit },
+                    JiraJsonContext.Default.JiraSearchRequest);
 
         var body = await SendAsync(request, cancellationToken);
 
@@ -86,12 +86,75 @@ public sealed class JiraClient
         return raw == null ? throw JiraException.Malformed() : ToIssue(raw) ?? throw JiraException.Malformed();
     }
 
+    // MARK: - Workflow
+
+    /// <summary>
+    /// The moves this issue can make right now. Transition names are the
+    /// project's own invention; the target status and its category are the part
+    /// that means the same thing in every project.
+    /// </summary>
+    public async Task<IReadOnlyList<JiraTransition>> GetTransitionsAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var body = await SendAsync(Request(HttpMethod.Get, TransitionsPath(key)), cancellationToken);
+
+        var response = Deserialize(body, JiraJsonContext.Default.JiraTransitionsResponse);
+        if (response?.Transitions == null) throw JiraException.Malformed();
+
+        var transitions = new List<JiraTransition>(response.Transitions.Count);
+        foreach (var raw in response.Transitions)
+        {
+            if (raw.Id is not { Length: > 0 } id) continue;
+            if (raw.IsAvailable == false) continue;
+
+            var name = raw.Name ?? id;
+            transitions.Add(new JiraTransition(
+                id,
+                name,
+                raw.To?.Name ?? name,
+                raw.To?.StatusCategory?.Key ?? "indeterminate")
+            {
+                HasScreen = raw.HasScreen ?? false
+            });
+        }
+
+        return transitions;
+    }
+
+    /// <summary>
+    /// Moves the issue along one workflow edge. Jira answers 204 with no body:
+    /// the status code is the whole answer, which is why nothing here parses
+    /// one — handing an empty body to Deserialize would read as malformed.
+    /// </summary>
+    public async Task TransitionAsync(string key, string transitionId, CancellationToken cancellationToken = default)
+    {
+        var request = Request(HttpMethod.Post, TransitionsPath(key));
+        SetJsonBody(request, new JiraTransitionRequest { Transition = new JiraIdDto { Id = transitionId } },
+                    JiraJsonContext.Default.JiraTransitionRequest);
+
+        await SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Assigns the issue; a null accountId unassigns it. 204 with no body, for
+    /// the same reason as <see cref="TransitionAsync"/>.
+    /// </summary>
+    public async Task AssignAsync(string key, string? accountId, CancellationToken cancellationToken = default)
+    {
+        var request = Request(HttpMethod.Put, IssuePath + Uri.EscapeDataString(key) + "/assignee");
+        SetJsonBody(request, new JiraAssigneeRequest { AccountId = accountId },
+                    JiraJsonContext.Default.JiraAssigneeRequest);
+
+        await SendAsync(request, cancellationToken);
+    }
+
     /// <summary>Where a human opens this issue.</summary>
     public Uri BrowseUrl(string key) => new(SiteRoot + "/browse/" + Uri.EscapeDataString(key));
 
     // MARK: - Transport
 
     private string SiteRoot => _credentials.Site.AbsoluteUri.TrimEnd('/');
+
+    private static string TransitionsPath(string key) => IssuePath + Uri.EscapeDataString(key) + "/transitions";
 
     private HttpRequestMessage Request(HttpMethod method, string path)
     {
@@ -101,6 +164,12 @@ public sealed class JiraClient
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", _credentials.AuthorizationHeader);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return request;
+    }
+
+    /// <summary>The body's media type lives here rather than at each call site, which is what Jira rejects a request for missing.</summary>
+    private static void SetJsonBody<T>(HttpRequestMessage request, T payload, JsonTypeInfo<T> typeInfo)
+    {
+        request.Content = new StringContent(JsonSerializer.Serialize(payload, typeInfo), Encoding.UTF8, "application/json");
     }
 
     private async Task<string> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -154,7 +223,7 @@ public sealed class JiraClient
         return null;
     }
 
-    private static T? Deserialize<T>(string body, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
+    private static T? Deserialize<T>(string body, JsonTypeInfo<T> typeInfo)
         where T : class
     {
         if (string.IsNullOrWhiteSpace(body)) return null;
@@ -184,6 +253,7 @@ public sealed class JiraClient
             JiraTimestamp.Parse(fields?.Updated))
         {
             AssigneeName = fields?.Assignee?.DisplayName,
+            AssigneeAccountId = fields?.Assignee?.AccountId,
             ReporterName = fields?.Reporter?.DisplayName,
             Created = JiraTimestamp.Parse(fields?.Created),
             Labels = fields?.Labels ?? new List<string>(),

@@ -78,6 +78,7 @@ public sealed partial class IssueWindow : Window
         TypeText.Text = issue.Type;
         PriorityText.Text = issue.Priority ?? "—";
         AssigneeText.Text = issue.AssigneeName ?? "Unassigned";
+        UpdateAssignButton();
         ReporterText.Text = issue.ReporterName ?? "—";
         CreatedText.Text = FormatDate(issue.Created);
         UpdatedText.Text = FormatDate(issue.Updated);
@@ -141,6 +142,126 @@ public sealed partial class IssueWindow : Window
         await Launcher.LaunchUriAsync(url);
     }
 
+    // MARK: - Acting on the issue
+
+    /// <summary>
+    /// The board's copy of this issue changed. Only the fields a write can move
+    /// are taken from it: that copy comes from the search, which never asks for
+    /// a description, and this window has already paid for one.
+    /// </summary>
+    public void UpdateIssue(JiraIssue? fresh)
+    {
+        if (fresh == null || fresh.Key != _issue.Key) return;
+
+        Apply(_issue with
+        {
+            Status = fresh.Status,
+            StatusCategory = fresh.StatusCategory,
+            AssigneeName = fresh.AssigneeName,
+            AssigneeAccountId = fresh.AssigneeAccountId
+        });
+    }
+
+    /// <summary>Re-reads what Jira is doing to this issue right now.</summary>
+    public void UpdateActionState()
+    {
+        var busy = _jira.IsIssueBusy(_issue.Key);
+
+        StatusButton.IsEnabled = !busy;
+        AssignToMeButton.IsEnabled = !busy;
+        UpdateAssignButton();
+        UpdateRepositoryState();
+
+        // Only this issue's news. A move on another card belongs on the board,
+        // not in a window that has nothing to do with it.
+        if (_jira.ActionIssueKey == _issue.Key && _jira.ActionMessage is { Length: > 0 } message)
+        {
+            ShowAction(message, _jira.ActionFailed);
+        }
+    }
+
+    /// <summary>
+    /// Hidden once we know the issue is already yours — which we may not know
+    /// at first paint: the account id arrives with the first search, after this
+    /// window may already be open.
+    /// </summary>
+    private void UpdateAssignButton()
+    {
+        var mine = _jira.MyAccountId;
+        AssignToMeButton.Visibility = mine != null && _issue.AssigneeAccountId == mine
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void ShowAction(string message, bool failed)
+    {
+        ActionInfoBar.Message = message;
+        ActionInfoBar.Severity = failed ? InfoBarSeverity.Error : InfoBarSeverity.Success;
+        ActionInfoBar.IsOpen = true;
+    }
+
+    private void ActionInfoBar_CloseButtonClick(InfoBar sender, object args)
+    {
+        ActionInfoBar.IsOpen = false;
+        _jira.ClearActionMessage();
+    }
+
+    /// <summary>Fills the status menu with the moves Jira allows from where the issue stands.</summary>
+    private async void StatusMenu_Opening(object? sender, object e)
+    {
+        StatusMenu.Items.Clear();
+        StatusMenu.Items.Add(new MenuFlyoutItem { Text = "Loading moves\u2026", IsEnabled = false });
+
+        IReadOnlyList<JiraTransition> transitions;
+        try
+        {
+            transitions = await _jira.TransitionsForAsync(_issue, _lifetime.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (!_lifetime.IsCancellationRequested) ReplaceStatusMenu(new MenuFlyoutItem { Text = ex.Message, IsEnabled = false });
+            return;
+        }
+
+        if (_lifetime.IsCancellationRequested || !StatusMenu.IsOpen) return;
+
+        StatusMenu.Items.Clear();
+
+        if (transitions.Count == 0)
+        {
+            StatusMenu.Items.Add(new MenuFlyoutItem { Text = "No moves available", IsEnabled = false });
+            return;
+        }
+
+        foreach (var transition in transitions)
+        {
+            var item = new MenuFlyoutItem
+            {
+                Text = JiraWorkflow.Label(transition, transitions) + (transition.HasScreen ? "\u2026" : string.Empty)
+            };
+
+            if (transition.HasScreen)
+            {
+                ToolTipService.SetToolTip(item, "Jira may ask for more before this move completes.");
+            }
+
+            item.Click += (_, _) => _ = _jira.MoveIssueAsync(_issue, transition);
+            StatusMenu.Items.Add(item);
+        }
+    }
+
+    private void ReplaceStatusMenu(MenuFlyoutItemBase item)
+    {
+        StatusMenu.Items.Clear();
+        StatusMenu.Items.Add(item);
+    }
+
+    private void AssignToMe_Click(object sender, RoutedEventArgs e) => _ = _jira.AssignToMeAsync(_issue);
+
     // MARK: - Branch
 
     /// <summary>Re-reads the repository. Called by the main window when it changes.</summary>
@@ -149,7 +270,9 @@ public sealed partial class IssueWindow : Window
         var hasRepository = !string.IsNullOrEmpty(_repository.RepositoryPath);
         var hasName = BranchNameTextBox.Text.Trim().Length > 0;
 
-        CreateBranchButton.IsEnabled = hasRepository && hasName && !_repository.IsBusy;
+        var canCreate = hasRepository && hasName && !_repository.IsBusy;
+        CreateBranchButton.IsEnabled = canCreate;
+        StartWorkButton.IsEnabled = canCreate && !_jira.IsIssueBusy(_issue.Key);
         ResetNameButton.IsEnabled = BranchNameTextBox.Text != _suggestion;
 
         TargetRepositoryText.Text = hasRepository
@@ -181,4 +304,56 @@ public sealed partial class IssueWindow : Window
     private void CreateBranch_Click(object sender, RoutedEventArgs e) => CreateBranch();
 
     private void CreateBranch() => _ = _repository.CreateBranchAsync(BranchNameTextBox.Text.Trim());
+
+    /// <summary>
+    /// Branch, then assign, then move — in that order on purpose. The local
+    /// step is the one most likely to fail (no repository open, a name already
+    /// taken), and claiming an issue for work that then has nowhere to happen
+    /// is the worse half to get wrong.
+    /// </summary>
+    private async void StartWork_Click(object sender, RoutedEventArgs e)
+    {
+        // RunGitAsync returns in silence while another git command runs, and a
+        // disabled button can be stale across an await.
+        if (_repository.IsBusy || _jira.IsIssueBusy(_issue.Key)) return;
+
+        StartWorkButton.IsEnabled = false;
+        ActionInfoBar.IsOpen = false;
+
+        try
+        {
+            await _repository.CreateBranchAsync(BranchNameTextBox.Text.Trim());
+            if (_repository.HasError)
+            {
+                ShowAction(_repository.ErrorMessage ?? "The branch could not be created.", failed: true);
+                return;
+            }
+
+            var outcome = await _jira.StartWorkJiraAsync(_issue);
+
+            // Null means Jira refused and already said why; anything else is a
+            // success, whole or partial, and partial is worth saying out loud.
+            if (outcome == null)
+            {
+                ShowAction(_jira.ActionMessage ?? "Jira refused the change.", failed: true);
+                return;
+            }
+
+            // Read the status back rather than trusting _issue: it is only
+            // current because the move's board update happens to have reached
+            // this window first, and that is not a thing to depend on.
+            var status = _jira.FindIssue(_issue.Key)?.Status ?? _issue.Status;
+
+            ShowAction(outcome switch
+            {
+                JiraStartWork.Move => $"Branch created, assigned to you, moved to {status}.",
+                JiraStartWork.AlreadyInProgress => "Branch created and assigned to you. It was already in progress.",
+                _ => "Branch created and assigned to you. This workflow has no in-progress move — change the status in Jira."
+            }, failed: false);
+        }
+        finally
+        {
+            UpdateRepositoryState();
+        }
+    }
 }

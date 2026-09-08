@@ -36,15 +36,22 @@
                         <TextBlock x:Name="KeyText" Grid.Column="0" FontFamily="Cascadia Mono, Consolas"
                                    FontWeight="SemiBold" VerticalAlignment="Center" />
 
-                        <!-- Status badge: 3px radius, not a pill. -->
-                        <Border x:Name="StatusBadge" Grid.Column="1" CornerRadius="3" Padding="6,1"
-                                VerticalAlignment="Center"
-                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                        <!-- Still the 3px badge, and now the way to move the
+                             issue: the status is the thing you want to change
+                             while looking at it. -->
+                        <DropDownButton x:Name="StatusButton" Grid.Column="1" CornerRadius="3" Padding="6,1"
+                                        MinWidth="0" MinHeight="0" BorderThickness="0"
+                                        VerticalAlignment="Center"
+                                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        ToolTipService.ToolTip="Move this issue">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center" />
                                 <TextBlock x:Name="StatusText" FontSize="12" VerticalAlignment="Center" />
                             </StackPanel>
-                        </Border>
+                            <DropDownButton.Flyout>
+                                <MenuFlyout x:Name="StatusMenu" Opening="StatusMenu_Opening" />
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
 
                         <Button x:Name="OpenInJiraButton" Grid.Column="3" Content="Open in Jira" Height="28"
                                 Padding="10,0" Click="OpenInJira_Click" />
@@ -73,7 +80,12 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Priority" Style="{StaticResource GHCaptionTextStyle}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" x:Name="PriorityText" FontSize="12" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Assignee" Style="{StaticResource GHCaptionTextStyle}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="AssigneeText" FontSize="12" />
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="AssigneeText" FontSize="12" VerticalAlignment="Center" />
+                            <HyperlinkButton x:Name="AssignToMeButton" Content="Assign to me"
+                                             FontSize="12" Padding="0" MinHeight="0"
+                                             Click="AssignToMe_Click" />
+                        </StackPanel>
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Reporter" Style="{StaticResource GHCaptionTextStyle}" />
                         <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ReporterText" FontSize="12" />
                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Created" Style="{StaticResource GHCaptionTextStyle}" />
@@ -125,6 +137,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
                         <!-- Suggested, never imposed: the name is editable before
@@ -141,12 +154,21 @@
 
                         <Button x:Name="CreateBranchButton" Grid.Column="2" Height="32"
                                 Content="Create Branch"
-                                Style="{StaticResource AccentButtonStyle}"
                                 Click="CreateBranch_Click" />
+
+                        <!-- Three things in one click, so the tooltip says all three. -->
+                        <Button x:Name="StartWorkButton" Grid.Column="3" Height="32"
+                                Content="Start Work"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="StartWork_Click"
+                                ToolTipService.ToolTip="Creates the branch, assigns the issue to you, and moves it to the in-progress status." />
                     </Grid>
 
                     <TextBlock x:Name="TargetRepositoryText" Style="{StaticResource GHCaptionTextStyle}"
                                TextWrapping="Wrap" />
+
+                    <InfoBar x:Name="ActionInfoBar" IsOpen="False" IsClosable="True" Severity="Success"
+                             CloseButtonClick="ActionInfoBar_CloseButtonClick" />
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>

@@ -2,7 +2,7 @@ namespace GitHalls.Core.Jira;
 
 public enum JiraFailure
 {
-    /// <summary>Jira rejected the credentials (401/403).</summary>
+    /// <summary>Jira refused the request (401/403): bad credentials, or a permission the account lacks.</summary>
     Unauthorized,
     /// <summary>Jira asked to slow down (429).</summary>
     RateLimited,
@@ -31,8 +31,15 @@ public sealed class JiraException : Exception
         RetryAfter = retryAfter;
     }
 
+    /// <summary>
+    /// 401 and 403 arrive here together. Saying only "bad credentials" was
+    /// close enough while everything was a read; a write gets 403 from a token
+    /// that reads the project fine but may not move or assign in it, and
+    /// telling that person their token is broken sends them to fix the wrong
+    /// thing.
+    /// </summary>
     public static JiraException Unauthorized() =>
-        new(JiraFailure.Unauthorized, "Jira rejected the credentials.", 401);
+        new(JiraFailure.Unauthorized, "Jira refused the request \u2014 check the credentials, or your permissions on this project.", 401);
 
     public static JiraException RateLimited(TimeSpan retryAfter) =>
         new(JiraFailure.RateLimited, "Jira asked to slow down (rate limited).", 429, retryAfter);

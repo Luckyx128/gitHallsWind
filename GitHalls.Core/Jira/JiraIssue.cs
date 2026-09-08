@@ -4,26 +4,34 @@ namespace GitHalls.Core.Jira;
 /// One Jira issue. The search fills in what a card shows; the detail fetch
 /// adds the rest (description, people, dates), which a list of fifty issues
 /// has no use for and would only make the search slower.
+///
+/// A record, and every property init-only, so that a write can produce a moved
+/// copy with "with" instead of a hand-written copy constructor listing every
+/// field — the kind that silently drops the next field somebody adds.
 /// </summary>
-public sealed class JiraIssue
+public sealed record JiraIssue
 {
-    public string Key { get; }
-    public string Summary { get; }
-    public string Status { get; }
+    public string Key { get; init; }
+    public string Summary { get; init; }
+    public string Status { get; init; }
 
     /// <summary>
     /// "new", "indeterminate" or "done" — Jira's own coarse grouping, which is
     /// stable across projects in a way status names are not.
     /// </summary>
-    public string StatusCategory { get; }
+    public string StatusCategory { get; init; }
 
-    public string Type { get; }
-    public string? Priority { get; }
-    public DateTimeOffset Updated { get; }
+    public string Type { get; init; }
+    public string? Priority { get; init; }
+    public DateTimeOffset Updated { get; init; }
 
     // MARK: - Detail fields
 
     public string? AssigneeName { get; init; }
+
+    /// <summary>Who Jira says it is assigned to, in the form an assign has to be written back in.</summary>
+    public string? AssigneeAccountId { get; init; }
+
     public string? ReporterName { get; init; }
     public DateTimeOffset Created { get; init; }
 

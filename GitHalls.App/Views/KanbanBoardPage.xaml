@@ -7,6 +7,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -38,9 +39,16 @@
                     ToolTipService.ToolTip="Run the query again" />
         </Grid>
 
+        <!-- What the last move or assign did. The empty state below can't say
+             it: that one is hidden whenever the board has columns, which is
+             exactly when a write happens. -->
+        <InfoBar x:Name="ActionInfoBar" Grid.Row="1" Margin="12,0,12,8"
+                 IsOpen="False" IsClosable="True" Severity="Success"
+                 CloseButtonClick="ActionInfoBar_CloseButtonClick" />
+
         <!-- Columns scroll sideways as one strip; each column scrolls its own
              cards. The strip is as tall as the pane, so the columns are too. -->
-        <ScrollViewer x:Name="BoardScroller" Grid.Row="1"
+        <ScrollViewer x:Name="BoardScroller" Grid.Row="2"
                       HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
                       VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
             <StackPanel x:Name="ColumnsPanel" Orientation="Horizontal" Spacing="12"
@@ -48,7 +56,7 @@
         </ScrollViewer>
 
         <!-- Not connected / error / nothing found, one at a time. -->
-        <StackPanel x:Name="StatePanel" Grid.Row="1" Spacing="10" Padding="24"
+        <StackPanel x:Name="StatePanel" Grid.Row="2" Spacing="10" Padding="24"
                     HorizontalAlignment="Center" VerticalAlignment="Center"
                     Visibility="Collapsed">
             <TextBlock x:Name="StateGlyph" Text="&#xE71B;" FontFamily="Segoe MDL2 Assets" FontSize="32"
