@@ -252,12 +252,12 @@ public class GitService
             throw new GitException("Only an https remote carries a username; this one does not.", current);
         }
 
-        if (GitRemoteUrl.OwnerAndRepository(current) is not { } parts)
+        if (GitRemoteUrl.ParseRemote(current) is not { } parts)
         {
-            throw new GitException("That remote is not a GitHub URL this app can rewrite.", current);
+            throw new GitException("That remote is not a recognized Git URL this app can rewrite.", current);
         }
 
-        var updated = GitRemoteUrl.WithUsername(parts.Owner, parts.Repository, username);
+        var updated = GitRemoteUrl.WithUsername(parts.Host, parts.Path, username);
         await _runner.RunAsync(repoPath, new[] { "remote", "set-url", remoteName, updated }, cancellationToken: cancellationToken);
     }
 

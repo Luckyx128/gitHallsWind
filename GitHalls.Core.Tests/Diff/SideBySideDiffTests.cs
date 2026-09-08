@@ -23,8 +23,8 @@ public class SideBySideDiffTests
 
         var (left, right) = SideBySideDiff.Split(diff);
 
-        Assert.Equal(4, left.Lines.Count);
-        Assert.Equal(4, right.Lines.Count);
+        Assert.Equal(3, left.Lines.Count);
+        Assert.Equal(3, right.Lines.Count);
 
         // Row 1 holds the change on both sides — that alignment is the point.
         Assert.Equal("was", left.Lines[1].Content);

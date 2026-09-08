@@ -76,9 +76,9 @@
                                Text="No identities saved yet." Visibility="Collapsed" />
 
                     <TextBox x:Name="LabelTextBox" Header="Label" PlaceholderText="Work" />
-                    <TextBox x:Name="NameTextBox" Header="Name" PlaceholderText="Erikson Santos" />
-                    <TextBox x:Name="IdentityEmailTextBox" Header="Email" PlaceholderText="you@company.com" />
-                    <TextBox x:Name="GitHubUserTextBox" Header="GitHub username (optional)" PlaceholderText="Luckyx128" />
+                    <TextBox x:Name="NameTextBox" Header="Name" PlaceholderText="Jane Doe" />
+                    <TextBox x:Name="IdentityEmailTextBox" Header="Email" PlaceholderText="jane@company.com" />
+                    <TextBox x:Name="GitHubUserTextBox" Header="GitHub username (optional)" PlaceholderText="janedoe" />
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button x:Name="SaveIdentityButton" Content="Save identity"

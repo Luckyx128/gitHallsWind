@@ -6,28 +6,28 @@ namespace GitHalls.Core.Tests.Git;
 public class GitRemoteUrlTests
 {
     [Theory]
-    [InlineData("https://github.com/Luckyx128/gitHallsWind.git", "Luckyx128", "gitHallsWind")]
-    [InlineData("https://github.com/Luckyx128/gitHallsWind", "Luckyx128", "gitHallsWind")]
-    [InlineData("git@github.com:Luckyx128/gitHallsWind.git", "Luckyx128", "gitHallsWind")]
-    [InlineData("ssh://git@github.com/Luckyx128/gitHallsWind.git", "Luckyx128", "gitHallsWind")]
-    [InlineData("  https://user@github.com/Luckyx128/gitHallsWind.git  ", "Luckyx128", "gitHallsWind")]
-    public void OwnerAndRepository_ReadsBothFormsGitWrites(string url, string owner, string repository)
+    [InlineData("https://github.com/Luckyx128/gitHallsWind.git", "github.com", "Luckyx128/gitHallsWind")]
+    [InlineData("https://github.com/Luckyx128/gitHallsWind", "github.com", "Luckyx128/gitHallsWind")]
+    [InlineData("git@github.com:Luckyx128/gitHallsWind.git", "github.com", "Luckyx128/gitHallsWind")]
+    [InlineData("ssh://git@github.com/Luckyx128/gitHallsWind.git", "github.com", "Luckyx128/gitHallsWind")]
+    [InlineData("  https://user@github.com/Luckyx128/gitHallsWind.git  ", "github.com", "Luckyx128/gitHallsWind")]
+    [InlineData("https://gitlab.com/owner/repo.git", "gitlab.com", "owner/repo")]
+    [InlineData("git@custom.server.com:group/subgroup/repo.git", "custom.server.com", "group/subgroup/repo")]
+    public void ParseRemote_ReadsBothFormsGitWrites(string url, string host, string path)
     {
-        var parsed = GitRemoteUrl.OwnerAndRepository(url);
+        var parsed = GitRemoteUrl.ParseRemote(url);
 
         Assert.NotNull(parsed);
-        Assert.Equal(owner, parsed!.Value.Owner);
-        Assert.Equal(repository, parsed.Value.Repository);
+        Assert.Equal(host, parsed!.Value.Host);
+        Assert.Equal(path, parsed.Value.Path);
     }
 
     [Theory]
-    [InlineData("https://gitlab.com/owner/repo.git")]   // another host entirely
-    [InlineData("https://github.com/owner")]            // no repository
     [InlineData("")]
     [InlineData(null)]
-    public void OwnerAndRepository_IsNullWhenThereIsNothingToRewrite(string? url)
+    public void ParseRemote_IsNullWhenThereIsNothingToRewrite(string? url)
     {
-        Assert.Null(GitRemoteUrl.OwnerAndRepository(url));
+        Assert.Null(GitRemoteUrl.ParseRemote(url));
     }
 
     [Fact]
@@ -35,6 +35,6 @@ public class GitRemoteUrlTests
     {
         Assert.Equal(
             "https://Luckyx128@github.com/Luckyx128/gitHallsWind.git",
-            GitRemoteUrl.WithUsername("Luckyx128", "gitHallsWind", "Luckyx128"));
+            GitRemoteUrl.WithUsername("github.com", "Luckyx128/gitHallsWind", "Luckyx128"));
     }
 }

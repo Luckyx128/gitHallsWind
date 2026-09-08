@@ -414,7 +414,7 @@ public sealed partial class MainWindow : Window
             var hasRepo = !string.IsNullOrEmpty(ViewModel.RepositoryPath);
             var name = hasRepo ? FolderName(ViewModel.RepositoryPath!) : null;
 
-            TitleBarText.Text = name == null ? "GitHalls" : $"GitHalls — {name}";
+            TitleBarText.Text = name == null ? "GitHalls" : $"GitHalls • {name}";
             RepositoryButtonText.Text = name ?? "Open Repository";
             ToolTipService.SetToolTip(RepositoryButton, ViewModel.RepositoryPath ?? "No repository open");
 
