@@ -9,8 +9,8 @@ namespace GitHalls.App.Controls;
 /// <summary>One saved identity, as the switcher lists it.</summary>
 public sealed class IdentityRow
 {
-    public GitIdentity Identity { get; init; } = new();
-    public bool IsActive { get; init; }
+    public GitIdentity Identity { get; set; } = new();
+    public bool IsActive { get; set; }
 
     public string Title => Identity.DisplayName;
     public string Subtitle => Identity.Email;
