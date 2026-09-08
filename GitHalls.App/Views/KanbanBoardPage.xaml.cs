@@ -25,6 +25,12 @@ public sealed partial class KanbanBoardPage : Page
     /// <summary>What the board currently shows, to skip rebuilding it for an unrelated change.</summary>
     private IReadOnlyList<JiraIssueGroup>? _shownColumns;
 
+    /// <summary>The card of each issue on screen, so one can be greyed without rebuilding the board.</summary>
+    private readonly Dictionary<string, Button> _cardsByKey = new(StringComparer.Ordinal);
+
+    /// <summary>The menu currently open, which a rebuild has to close before it destroys what it is anchored to.</summary>
+    private MenuFlyout? _openMenu;
+
     /// <summary>Raised with the issue whose card was clicked.</summary>
     public event EventHandler<JiraIssue>? IssueOpened;
 
@@ -79,6 +85,10 @@ public sealed partial class KanbanBoardPage : Page
                 ? $"{ViewModel.IssueCount} issues"
                 : $"{shownCount} of {ViewModel.IssueCount} issues";
 
+        ActionInfoBar.Message = ViewModel.ActionMessage ?? string.Empty;
+        ActionInfoBar.Severity = ViewModel.ActionFailed ? InfoBarSeverity.Error : InfoBarSeverity.Success;
+        ActionInfoBar.IsOpen = !string.IsNullOrEmpty(ViewModel.ActionMessage);
+
         var hasColumns = columns.Count > 0;
         BoardScroller.Visibility = hasColumns ? Visibility.Visible : Visibility.Collapsed;
         FilterTextBox.IsEnabled = ViewModel.IssueCount > 0;
@@ -114,8 +124,30 @@ public sealed partial class KanbanBoardPage : Page
 
     private void RebuildColumns(IReadOnlyList<JiraIssueGroup> columns)
     {
+        // The button an open menu points at is about to stop existing.
+        _openMenu?.Hide();
+        _openMenu = null;
+
+        _cardsByKey.Clear();
         ColumnsPanel.Children.Clear();
         foreach (var column in columns) ColumnsPanel.Children.Add(BuildColumn(column));
+    }
+
+    /// <summary>
+    /// Greys the cards a write is running on. Deliberately not a rebuild:
+    /// <see cref="Update"/> skips one when the columns have not changed, and
+    /// throwing away every card to dim one would be a poor trade.
+    /// </summary>
+    public void UpdateBusyCards()
+    {
+        if (ViewModel == null) return;
+
+        foreach (var (key, card) in _cardsByKey)
+        {
+            var busy = ViewModel.IsIssueBusy(key);
+            card.IsEnabled = !busy;
+            card.Opacity = busy ? 0.5 : 1.0;
+        }
     }
 
     private Border BuildColumn(JiraIssueGroup column)
@@ -238,6 +270,23 @@ public sealed partial class KanbanBoardPage : Page
         };
         ToolTipService.SetToolTip(card, $"{issue.Key} — {issue.Summary}");
         card.Click += Card_Click;
+
+        // ContextFlyout rather than a RightTapped handler that fetches and then
+        // shows: the moves take a round trip, and a right-click that does
+        // nothing meanwhile reads as a broken app. The menu opens at once and
+        // fills itself in.
+        var menu = new MenuFlyout();
+        menu.Opening += CardMenu_Opening;
+        menu.Closed += (sender, _) => { if (ReferenceEquals(_openMenu, sender)) _openMenu = null; };
+        card.ContextFlyout = menu;
+
+        if (ViewModel.IsIssueBusy(issue.Key))
+        {
+            card.IsEnabled = false;
+            card.Opacity = 0.5;
+        }
+
+        _cardsByKey[issue.Key] = card;
         return card;
     }
 
@@ -264,10 +313,87 @@ public sealed partial class KanbanBoardPage : Page
         if ((sender as Button)?.Tag is JiraIssue issue) IssueOpened?.Invoke(this, issue);
     }
 
+    /// <summary>
+    /// Fills the card's menu with the moves Jira allows right now. Async void
+    /// because it is an event handler, which is the one place it belongs.
+    /// </summary>
+    private async void CardMenu_Opening(object? sender, object e)
+    {
+        if (sender is not MenuFlyout menu) return;
+        if ((menu.Target as Button)?.Tag is not JiraIssue issue) return;
+
+        _openMenu = menu;
+
+        // Never an empty menu: something stands there while the answer travels.
+        menu.Items.Clear();
+        menu.Items.Add(Disabled("Loading moves\u2026"));
+
+        IReadOnlyList<JiraTransition> transitions;
+        try
+        {
+            transitions = await ViewModel.TransitionsForAsync(issue);
+        }
+        catch (Exception ex)
+        {
+            if (menu.IsOpen) Replace(menu, Disabled(ex.Message));
+            return;
+        }
+
+        // The user closed it, or right-clicked another card: an answer to a
+        // question nobody is still asking must not repaint someone else's menu.
+        if (!menu.IsOpen || !ReferenceEquals(_openMenu, menu)) return;
+
+        menu.Items.Clear();
+
+        if (transitions.Count == 0)
+        {
+            menu.Items.Add(Disabled("No moves available"));
+        }
+
+        foreach (var transition in transitions)
+        {
+            var item = new MenuFlyoutItem
+            {
+                Text = JiraWorkflow.Label(transition, transitions) + (transition.HasScreen ? "\u2026" : string.Empty)
+            };
+
+            if (transition.HasScreen)
+            {
+                ToolTipService.SetToolTip(item, "Jira may ask for more before this move completes.");
+            }
+
+            item.Click += (_, _) => _ = ViewModel.MoveIssueAsync(issue, transition);
+            menu.Items.Add(item);
+        }
+
+        menu.Items.Add(AssignItem(issue));
+    }
+
+    /// <summary>"Assign to me", or a statement that it already is when the account id is known.</summary>
+    private MenuFlyoutItemBase AssignItem(JiraIssue issue)
+    {
+        var mine = ViewModel.MyAccountId;
+        if (mine != null && issue.AssigneeAccountId == mine) return Disabled("Assigned to you");
+
+        var item = new MenuFlyoutItem { Text = "Assign to me" };
+        item.Click += (_, _) => _ = ViewModel.AssignToMeAsync(issue);
+        return item;
+    }
+
+    private static MenuFlyoutItem Disabled(string text) => new() { Text = text, IsEnabled = false };
+
+    private static void Replace(MenuFlyout menu, MenuFlyoutItemBase item)
+    {
+        menu.Items.Clear();
+        menu.Items.Add(item);
+    }
+
     private void FilterTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         ViewModel.FilterText = FilterTextBox.Text;
     }
+
+    private void ActionInfoBar_CloseButtonClick(InfoBar sender, object args) => ViewModel.ClearActionMessage();
 
     private void Refresh_Click(object sender, RoutedEventArgs e)
     {

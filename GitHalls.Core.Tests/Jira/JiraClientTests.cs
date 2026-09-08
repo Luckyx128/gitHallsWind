@@ -190,7 +190,7 @@ public class JiraClientTests
             "priority": { "name": "High" },
             "updated": "2026-08-07T14:02:11.123-0300",
             "created": "2026-08-01T09:00:00.000-0300",
-            "assignee": { "displayName": "Erikson" },
+            "assignee": { "accountId": "5f2a1b", "displayName": "Erikson" },
             "reporter": { "displayName": "Ana" },
             "labels": ["mobile", "whatsapp"],
             "description": {
@@ -215,6 +215,8 @@ public class JiraClientTests
         Assert.Contains("description", handler.LastRequest.RequestUri.Query);
 
         Assert.Equal("Erikson", issue.AssigneeName);
+        // The id, not the name, is what an assign has to be written back with.
+        Assert.Equal("5f2a1b", issue.AssigneeAccountId);
         Assert.Equal("Ana", issue.ReporterName);
         Assert.Equal(new[] { "mobile", "whatsapp" }, issue.Labels);
         Assert.Equal(1, issue.Created.Day);
@@ -234,6 +236,149 @@ public class JiraClientTests
         Assert.Equal("Bo", issue.AssigneeName);
         Assert.Contains("\"assignee\"", handler.LastBody);
         Assert.DoesNotContain("description", handler.LastBody);
+    }
+
+    // MARK: - Workflow
+
+    private const string TransitionsBody = """
+    {
+      "transitions": [
+        {
+          "id": "21",
+          "name": "Start progress",
+          "to": { "name": "In Progress", "statusCategory": { "key": "indeterminate" } }
+        },
+        {
+          "id": "31",
+          "name": "Done",
+          "hasScreen": true,
+          "to": { "name": "Done", "statusCategory": { "key": "done" } }
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public async Task GetTransitionsAsync_ReadsTheMovesAndWhereTheyLead()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.OK, TransitionsBody);
+
+        var transitions = await client.GetTransitionsAsync("SWEB-6832");
+
+        Assert.Equal(2, transitions.Count);
+        Assert.Equal("21", transitions[0].Id);
+        Assert.Equal("Start progress", transitions[0].Name);
+        Assert.Equal("In Progress", transitions[0].ToStatus);
+        Assert.True(transitions[0].LeadsToInProgress);
+        Assert.False(transitions[0].HasScreen);
+        Assert.True(transitions[1].HasScreen);
+        Assert.False(transitions[1].LeadsToInProgress);
+
+        Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/SWEB-6832/transitions", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal("Basic", handler.LastRequest.Headers.Authorization!.Scheme);
+    }
+
+    [Fact]
+    public async Task GetTransitionsAsync_SkipsATransitionWithNoId()
+    {
+        const string body = """
+        { "transitions": [ { "name": "Nameless", "to": { "name": "Done" } }, { "id": "5", "name": "Close" } ] }
+        """;
+
+        var (client, _) = ClientFor(HttpStatusCode.OK, body);
+
+        var transition = Assert.Single(await client.GetTransitionsAsync("SWEB-1"));
+        Assert.Equal("5", transition.Id);
+        // With no "to" of its own, a move is described by its own name.
+        Assert.Equal("Close", transition.ToStatus);
+    }
+
+    [Fact]
+    public async Task GetTransitionsAsync_SkipsOneJiraSaysIsNotAvailable()
+    {
+        const string body = """
+        {
+          "transitions": [
+            { "id": "9", "name": "Blocked", "isAvailable": false, "to": { "name": "Blocked" } },
+            { "id": "10", "name": "Close", "to": { "name": "Done", "statusCategory": { "key": "done" } } }
+          ]
+        }
+        """;
+
+        var (client, _) = ClientFor(HttpStatusCode.OK, body);
+
+        var transition = Assert.Single(await client.GetTransitionsAsync("SWEB-1"));
+        Assert.Equal("10", transition.Id);
+    }
+
+    [Fact]
+    public async Task GetTransitionsAsync_ReportsAnUnexpectedShapeRatherThanCrashing()
+    {
+        var (client, _) = ClientFor(HttpStatusCode.OK, "{}");
+
+        var error = await Assert.ThrowsAsync<JiraException>(() => client.GetTransitionsAsync("SWEB-1"));
+        Assert.Equal(JiraFailure.MalformedResponse, error.Failure);
+    }
+
+    // MARK: - Writes
+
+    [Fact]
+    public async Task TransitionAsync_PostsTheTransitionIdToTheIssuesTransitions()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.TransitionAsync("SWEB-6832", "31");
+
+        Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/SWEB-6832/transitions", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal("application/json", handler.LastRequest.Content!.Headers.ContentType!.MediaType);
+        Assert.Contains("\"id\":\"31\"", handler.LastBody);
+    }
+
+    /// <summary>The 204 has no body, and reading that as a failed parse is the mistake waiting to be made.</summary>
+    [Fact]
+    public async Task TransitionAsync_AcceptsTheEmptyBodyOfA204()
+    {
+        var (client, _) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.TransitionAsync("SWEB-1", "5");
+    }
+
+    [Fact]
+    public async Task TransitionAsync_RepeatsWhatJiraSaidAboutARefusedMove()
+    {
+        const string body = """
+        { "errorMessages": ["Field 'resolution' is required."] }
+        """;
+
+        var (client, _) = ClientFor(HttpStatusCode.BadRequest, body);
+
+        var error = await Assert.ThrowsAsync<JiraException>(() => client.TransitionAsync("SWEB-1", "31"));
+        Assert.Equal("Field 'resolution' is required.", error.Message);
+    }
+
+    [Fact]
+    public async Task AssignAsync_PutsTheAccountIdOnTheAssigneeEndpoint()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.AssignAsync("SWEB-6832", "5f2a1b");
+
+        Assert.Equal(HttpMethod.Put, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/SWEB-6832/assignee", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"accountId\":\"5f2a1b\"", handler.LastBody);
+    }
+
+    /// <summary>Unassigning is an explicit null, not an omitted property.</summary>
+    [Fact]
+    public async Task AssignAsync_SendsAnExplicitNullToUnassign()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.AssignAsync("SWEB-6832", null);
+
+        Assert.Contains("\"accountId\":null", handler.LastBody);
     }
 
     [Fact]

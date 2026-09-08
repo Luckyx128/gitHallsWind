@@ -52,6 +52,7 @@ internal sealed class JiraFieldsDto
 
 internal sealed class JiraUserDto
 {
+    public string? AccountId { get; set; }
     public string? DisplayName { get; set; }
 }
 
@@ -71,6 +72,48 @@ internal sealed class JiraNamedDto
     public string? Name { get; set; }
 }
 
+internal sealed class JiraTransitionsResponse
+{
+    public List<JiraTransitionDto>? Transitions { get; set; }
+}
+
+internal sealed class JiraTransitionDto
+{
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+
+    /// <summary>Where the move lands. The same shape as an issue's own status, so it reuses it.</summary>
+    public JiraStatusDto? To { get; set; }
+
+    /// <summary>Absent means available; Jira only sends it false when it wants to say so.</summary>
+    public bool? IsAvailable { get; set; }
+
+    /// <summary>The move opens a form in Jira — it will refuse a bare POST that skips the fields.</summary>
+    public bool? HasScreen { get; set; }
+}
+
+internal sealed class JiraTransitionRequest
+{
+    public JiraIdDto Transition { get; set; } = new();
+}
+
+internal sealed class JiraIdDto
+{
+    public string? Id { get; set; }
+}
+
+internal sealed class JiraAssigneeRequest
+{
+    /// <summary>
+    /// Written even when null: {"accountId":null} is how Jira spells "unassign",
+    /// and a request that leaves the property out is not the same request. The
+    /// attribute is redundant today and guards the day someone adds
+    /// DefaultIgnoreCondition to the context below.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? AccountId { get; set; }
+}
+
 internal sealed class JiraMyselfResponse
 {
     public string? AccountId { get; set; }
@@ -87,6 +130,9 @@ internal sealed class JiraErrorResponse
 [JsonSerializable(typeof(JiraSearchRequest))]
 [JsonSerializable(typeof(JiraSearchResponse))]
 [JsonSerializable(typeof(JiraIssueDto))]
+[JsonSerializable(typeof(JiraTransitionsResponse))]
+[JsonSerializable(typeof(JiraTransitionRequest))]
+[JsonSerializable(typeof(JiraAssigneeRequest))]
 [JsonSerializable(typeof(JiraMyselfResponse))]
 [JsonSerializable(typeof(JiraErrorResponse))]
 internal partial class JiraJsonContext : JsonSerializerContext

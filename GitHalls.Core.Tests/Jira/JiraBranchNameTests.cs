@@ -5,34 +5,49 @@ namespace GitHalls.Core.Tests.Jira;
 
 public class JiraBranchNameTests
 {
-    [Theory]
-    [InlineData("SWEB-6832", "Fix the login form", "SWEB-6832-fix-the-login-form")]
-    [InlineData("ABC-1", "  Spaces   everywhere  ", "ABC-1-spaces-everywhere")]
-    [InlineData("ABC-2", "Slashes/and:colons", "ABC-2-slashes-and-colons")]
-    [InlineData("ABC-3", "Acentuação é comum", "ABC-3-acentua-o-comum")]
-    public void Suggest_TurnsTheSummaryIntoSomethingGitAccepts(string key, string summary, string expected)
-    {
-        Assert.Equal(expected, JiraBranchName.Suggest(key, summary));
-    }
+    private static JiraIssue Issue(string key, string type, string summary) =>
+        new(key, summary, "To Do", "new", type, null, DateTimeOffset.UnixEpoch);
 
     [Theory]
-    [InlineData("")]
-    [InlineData("!!!")]
-    [InlineData(null)]
-    public void Suggest_FallsBackToTheKeyAloneWhenNothingSurvives(string? summary)
+    [InlineData("Bug", "SWEB-12903", "fix-SWEB-12903")]
+    [InlineData("Story", "SWEB-12903", "feature-SWEB-12903")]
+    [InlineData("Task", "SWEB-12903", "chore-SWEB-12903")]
+    public void Suggest_NamesTheBranchAfterTheTypeAndTheKey(string type, string key, string expected)
     {
-        Assert.Equal("ABC-9", JiraBranchName.Suggest("ABC-9", summary));
+        Assert.Equal(expected, JiraBranchName.Suggest(Issue(key, type, "Anything at all")));
     }
 
     [Fact]
-    public void Suggest_TruncatesWithoutLeavingATrailingDash()
+    public void Suggest_KeepsTheKeyExactlyAsJiraSpellsIt()
     {
-        var suggestion = JiraBranchName.Suggest("ABC-1", new string('a', 39) + " tail");
+        Assert.Equal("feature-SWEB-12903", JiraBranchName.SuggestFor("SWEB-12903", "Story"));
+    }
 
-        Assert.StartsWith("ABC-1-", suggestion);
-        Assert.DoesNotContain("--", suggestion);
-        Assert.False(suggestion.EndsWith('-'), "a branch name should not end in a dash");
-        // Key, dash, and at most the 40-character slug.
-        Assert.True(suggestion.Length <= "ABC-1".Length + 1 + 40);
+    [Fact]
+    public void Suggest_DropsTheSummaryEntirely()
+    {
+        var issue = Issue("ABC-1", "Task", "A summary long enough to have been a slug before");
+        Assert.Equal("chore-ABC-1", JiraBranchName.Suggest(issue));
+    }
+
+    [Theory]
+    [InlineData("Spike")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Suggest_UsesFeatureForAnIssueTypeItDoesNotKnow(string? type)
+    {
+        Assert.Equal("feature-ABC-9", JiraBranchName.SuggestFor("ABC-9", type));
+    }
+
+    [Fact]
+    public void Suggest_CollapsesWhatGitWouldRefuseInAKey()
+    {
+        Assert.Equal("feature-ABC-9", JiraBranchName.SuggestFor("  ABC 9  ", "Story"));
+    }
+
+    [Fact]
+    public void Suggest_FallsBackToTheTypeAloneWhenNothingSurvivesTheKey()
+    {
+        Assert.Equal("fix", JiraBranchName.SuggestFor("~~~", "Bug"));
     }
 }

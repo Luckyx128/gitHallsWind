@@ -136,10 +136,37 @@ public sealed partial class MainWindow : Window
                 break;
 
             case nameof(ViewModels.JiraViewModel.Columns):
+                (ContentFrame.Content as KanbanBoardPage)?.Update();
+                // A write moves the issue for the board and for whoever has it
+                // open: until now issue windows only heard about the repository.
+                foreach (var issueWindow in _issueWindows.Values)
+                {
+                    issueWindow.UpdateIssue(JiraViewModel.FindIssue(issueWindow.Key));
+                }
+                break;
+
             case nameof(ViewModels.JiraViewModel.IsLoading):
             case nameof(ViewModels.JiraViewModel.ErrorMessage):
             case nameof(ViewModels.JiraViewModel.HasSearched):
                 (ContentFrame.Content as KanbanBoardPage)?.Update();
+                break;
+
+            case nameof(ViewModels.JiraViewModel.BusyIssueKeys):
+                // Its own case, not a ride on Columns: Update() skips the
+                // rebuild when the columns are unchanged, which is exactly the
+                // case here.
+                (ContentFrame.Content as KanbanBoardPage)?.UpdateBusyCards();
+                foreach (var issueWindow in _issueWindows.Values) issueWindow.UpdateActionState();
+                break;
+
+            case nameof(ViewModels.JiraViewModel.MyAccountId):
+                foreach (var issueWindow in _issueWindows.Values) issueWindow.UpdateActionState();
+                break;
+
+            case nameof(ViewModels.JiraViewModel.ActionMessage):
+            case nameof(ViewModels.JiraViewModel.ActionFailed):
+                (ContentFrame.Content as KanbanBoardPage)?.Update();
+                foreach (var issueWindow in _issueWindows.Values) issueWindow.UpdateActionState();
                 break;
 
             case nameof(ViewModels.JiraViewModel.IsConfigured):
