@@ -106,10 +106,11 @@ public class ConventionalCommitSuggesterTests
     }
 
     [Fact]
-    public void SuggestType_WithoutNumstat_FallsBackToChore()
+    public void SuggestType_WithoutNumstat_StillReadsAModificationAsAFix()
     {
-        // A modified file with no line counts available carries no signal.
-        Assert.Same(ConventionalCommitType.Chore, ConventionalCommitSuggester.SuggestType(new[] { Staged("src/App.cs") }));
+        // The counts are missing, not zero: the file was modified, and that is
+        // signal enough. Chore would claim the commit changes nothing.
+        Assert.Same(ConventionalCommitType.Fix, ConventionalCommitSuggester.SuggestType(new[] { Staged("src/App.cs") }));
     }
 
     [Fact]
