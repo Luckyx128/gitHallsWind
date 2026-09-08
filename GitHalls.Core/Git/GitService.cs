@@ -420,6 +420,38 @@ public class GitService
         await _runner.RunAsync(repoPath, new[] { "checkout", "-b", branchName }, cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// The bytes of a path at a revision — "HEAD", a hash, or "&lt;hash&gt;^".
+    ///
+    /// Null when the path is not there: a file that was just added has no
+    /// previous revision, and a deleted one has no current one. git says so with
+    /// a non-zero exit, which is a normal answer here and not a failure.
+    /// </summary>
+    public async Task<byte[]?> GetBlobAsync(string repoPath, string revision, string filePath, CancellationToken cancellationToken = default)
+    {
+        var result = await _runner.RunBytesAsync(repoPath, new[] { "show", $"{revision}:{filePath}" }, cancellationToken);
+
+        return result.ExitCode == 0 ? result.Output : null;
+    }
+
+    /// <summary>
+    /// The bytes on disk — the working tree side of a change, which no revision
+    /// names. Null when the file is gone, which a deletion makes normal.
+    /// </summary>
+    public static async Task<byte[]?> GetWorkingTreeBytesAsync(string repoPath, string filePath, CancellationToken cancellationToken = default)
+    {
+        var full = Path.Combine(repoPath, filePath.Replace('/', Path.DirectorySeparatorChar));
+
+        try
+        {
+            return File.Exists(full) ? await File.ReadAllBytesAsync(full, cancellationToken) : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
     public async Task FetchAsync(string repoPath, CancellationToken cancellationToken = default)
     {
         await _runner.RunAsync(repoPath, new[] { "fetch" }, cancellationToken: cancellationToken);

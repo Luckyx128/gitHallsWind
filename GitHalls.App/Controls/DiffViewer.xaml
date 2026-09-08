@@ -19,5 +19,8 @@
             <controls:DiffTextView x:Name="LeftView" Grid.Column="0" SingleNumberColumn="True" />
             <controls:DiffTextView x:Name="RightView" Grid.Column="1" SingleNumberColumn="True" />
         </Grid>
+
+        <!-- Stands in for the text views when git has no text: the file itself. -->
+        <controls:FilePreviewView x:Name="PreviewView" Visibility="Collapsed" />
     </Grid>
 </UserControl>

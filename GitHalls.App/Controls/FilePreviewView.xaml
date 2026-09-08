@@ -1,0 +1,45 @@
+<UserControl
+    x:Class="GitHalls.App.Controls.FilePreviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <Grid Padding="16">
+            <!-- An image, before beside after. Either side is dropped when the
+                 file was added or deleted. -->
+            <StackPanel x:Name="ImagePanel" Orientation="Horizontal" Spacing="16"
+                        HorizontalAlignment="Center" Visibility="Collapsed">
+                <StackPanel x:Name="BeforePanel" Spacing="6" Visibility="Collapsed">
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="4" Padding="4">
+                        <Image x:Name="BeforeImage" MaxWidth="420" MaxHeight="420" Stretch="Uniform" />
+                    </Border>
+                    <TextBlock x:Name="BeforeCaption" HorizontalAlignment="Center"
+                               Style="{StaticResource GHCaptionTextStyle}" />
+                </StackPanel>
+
+                <StackPanel x:Name="AfterPanel" Spacing="6" Visibility="Collapsed">
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="4" Padding="4">
+                        <Image x:Name="AfterImage" MaxWidth="420" MaxHeight="420" Stretch="Uniform" />
+                    </Border>
+                    <TextBlock x:Name="AfterCaption" HorizontalAlignment="Center"
+                               Style="{StaticResource GHCaptionTextStyle}" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Everything else: what it is and how big it got, which is the
+                 whole of what a diff could honestly say about it. -->
+            <StackPanel x:Name="OtherPanel" Spacing="8" Visibility="Collapsed"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                <FontIcon x:Name="OtherGlyph" FontFamily="Segoe MDL2 Assets" FontSize="32" Glyph="&#xE8A5;" />
+                <TextBlock x:Name="OtherTypeText" HorizontalAlignment="Center"
+                           Style="{StaticResource GHSectionHeaderTextStyle}" />
+                <TextBlock x:Name="OtherSizeText" HorizontalAlignment="Center"
+                           Style="{StaticResource GHCaptionTextStyle}" />
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

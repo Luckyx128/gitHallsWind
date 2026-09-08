@@ -21,6 +21,12 @@ public class GitProcessResult
 public interface IGitProcessRunner
 {
     Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string? stdinData = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same run with stdout left as bytes, and the exit code instead of an
+    /// exception: a missing path at a revision is a normal answer here.
+    /// </summary>
+    Task<(byte[] Output, int ExitCode)> RunBytesAsync(string workingDirectory, IEnumerable<string> arguments, CancellationToken cancellationToken = default);
 }
 
 public class GitProcessRunner : IGitProcessRunner
@@ -41,16 +47,10 @@ public class GitProcessRunner : IGitProcessRunner
         return "git.exe";
     }
 
-    public async Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string? stdinData = null, CancellationToken cancellationToken = default)
+    /// <summary>The prelude, environment and redirection every git call shares.</summary>
+    private static ProcessStartInfo StartInfoFor(string workingDirectory, IEnumerable<string> arguments, bool redirectStdin)
     {
-        var argsList = new List<string>
-        {
-            "-c", "core.longpaths=true",
-            "-c", "i18n.logOutputEncoding=UTF-8"
-        };
-        argsList.AddRange(arguments);
-
-        var processStartInfo = new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = GitExecutablePath,
             WorkingDirectory = workingDirectory,
@@ -58,19 +58,68 @@ public class GitProcessRunner : IGitProcessRunner
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = stdinData != null,
+            RedirectStandardInput = redirectStdin,
             StandardOutputEncoding = new UTF8Encoding(false),
             StandardErrorEncoding = new UTF8Encoding(false),
         };
 
-        // Environment variables
-        processStartInfo.Environment["LC_ALL"] = "C";
-        processStartInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        startInfo.Environment["LC_ALL"] = "C";
+        startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
-        foreach (var arg in argsList)
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("core.longpaths=true");
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("i18n.logOutputEncoding=UTF-8");
+
+        foreach (var argument in arguments)
         {
-            processStartInfo.ArgumentList.Add(arg);
+            startInfo.ArgumentList.Add(argument);
         }
+
+        return startInfo;
+    }
+
+    /// <summary>
+    /// Reads stdout as bytes rather than text. Decoding a PNG as UTF-8 does not
+    /// fail loudly — it replaces every invalid byte with U+FFFD — so anything
+    /// that wants the file itself has to come through here.
+    /// </summary>
+    public async Task<(byte[] Output, int ExitCode)> RunBytesAsync(string workingDirectory, IEnumerable<string> arguments, CancellationToken cancellationToken = default)
+    {
+        var startInfo = StartInfoFor(workingDirectory, arguments, redirectStdin: false);
+
+        // No encoding is set: setting one would install a StreamReader over the
+        // stream this method is about to read raw.
+        startInfo.StandardOutputEncoding = null;
+
+        using var process = new Process { StartInfo = startInfo };
+
+        try
+        {
+            process.Start();
+        }
+        catch (Exception ex)
+        {
+            throw new GitException($"Failed to start Git process. Please ensure Git for Windows is installed. ({ex.Message})", string.Empty);
+        }
+
+        using var buffer = new MemoryStream();
+
+        // stderr is drained too, and at the same time: it is redirected, so
+        // leaving it unread lets a full pipe block git before it finishes
+        // writing the file.
+        var stdout = process.StandardOutput.BaseStream.CopyToAsync(buffer, cancellationToken);
+        var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+
+        await Task.WhenAll(stdout, stderr);
+        await process.WaitForExitAsync(cancellationToken);
+
+        return (buffer.ToArray(), process.ExitCode);
+    }
+
+    public async Task<GitProcessResult> RunAsync(string workingDirectory, IEnumerable<string> arguments, string? stdinData = null, CancellationToken cancellationToken = default)
+    {
+        var processStartInfo = StartInfoFor(workingDirectory, arguments, redirectStdin: stdinData != null);
 
         using var process = new Process { StartInfo = processStartInfo };
         

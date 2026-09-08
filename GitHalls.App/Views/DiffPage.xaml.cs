@@ -1,3 +1,4 @@
+using GitHalls.Core.Diff;
 using GitHalls.Core.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -15,9 +16,12 @@ public sealed partial class DiffPage : Page
     /// window owns the preference and hands it over with every update.</summary>
     public void SetSideBySide(bool sideBySide) => DiffView.SideBySide = sideBySide;
 
-    public void UpdateDiff(FileDiff? diff)
+    public void UpdateDiff(FileDiff? diff) => UpdateDiff(diff, null);
+
+    public void UpdateDiff(FileDiff? diff, BinaryFileContents? preview)
     {
         DiffView.SetDiff(diff);
+        DiffView.SetPreview(preview);
 
         if (diff == null)
         {

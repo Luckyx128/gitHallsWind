@@ -16,6 +16,7 @@ namespace GitHalls.App.Controls;
 public sealed partial class DiffViewer : UserControl
 {
     private FileDiff? _diff;
+    private BinaryFileContents? _preview;
     private bool _sideBySide;
 
     public DiffViewer()
@@ -41,11 +42,45 @@ public sealed partial class DiffViewer : UserControl
     public void SetDiff(FileDiff? diff)
     {
         _diff = diff;
+
+        // A text diff cannot have a preview. Clearing it here is what stops the
+        // order these two setters are called in from leaving the previous
+        // file's image on screen for a frame.
+        if (diff is not { IsBinary: true }) _preview = null;
+
+        Apply();
+    }
+
+    /// <summary>
+    /// The file behind a binary diff. Set alongside the diff, and null for
+    /// anything git had text for.
+    /// </summary>
+    public void SetPreview(BinaryFileContents? preview)
+    {
+        _preview = preview;
         Apply();
     }
 
     private void Apply()
     {
+        // A file with no text diff is shown, not described. Everything below
+        // this point is about text, and none of it applies.
+        if (_preview is { HasSomethingToShow: true })
+        {
+            UnifiedView.SetDiff(null);
+            UnifiedView.Visibility = Visibility.Collapsed;
+            LeftView.SetDiff(null);
+            RightView.SetDiff(null);
+            SplitGrid.Visibility = Visibility.Collapsed;
+
+            PreviewView.Visibility = Visibility.Visible;
+            _ = PreviewView.ShowAsync(_preview);
+            return;
+        }
+
+        PreviewView.Visibility = Visibility.Collapsed;
+        _ = PreviewView.ShowAsync(null);
+
         // A binary file or a one-line notice has no second side to show.
         var split = _sideBySide && _diff != null && SideBySideDiff.HasTwoSides(_diff);
 

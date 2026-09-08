@@ -1,4 +1,5 @@
 using GitHalls.App.ViewModels;
+using GitHalls.Core.Diff;
 using GitHalls.Core.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -98,6 +99,9 @@ public sealed partial class CommitDetailPage : Page
         };
     }
 
+    /// <summary>Mirrors <see cref="_shownDiff"/>: cheap to compare, and a rebuild is not.</summary>
+    private BinaryFileContents? _shownPreview;
+
     private void UpdateDiff()
     {
         // Cheap when unchanged; the viewer only rebuilds on a real switch.
@@ -121,6 +125,15 @@ public sealed partial class CommitDetailPage : Page
         {
             _shownDiff = diff;
             DiffView.SetDiff(diff);
+        }
+
+        // Its own comparison: the preview arrives one property change after the
+        // diff it belongs to, so it cannot ride on the check above.
+        var preview = ViewModel.CommitFilePreview;
+        if (!ReferenceEquals(_shownPreview, preview))
+        {
+            _shownPreview = preview;
+            DiffView.SetPreview(preview);
         }
 
         DiffView.Visibility = diff == null ? Visibility.Collapsed : Visibility.Visible;

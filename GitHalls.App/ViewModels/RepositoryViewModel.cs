@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GitHalls.App.Services;
 using GitHalls.Core.Commits;
+using GitHalls.Core.Diff;
 using GitHalls.Core.Git;
 using GitHalls.Core.GitHub;
 using GitHalls.Core.Models;
@@ -87,6 +88,13 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _isLoadingCommitFileDiff;
+
+    /// <summary>The bytes behind the selected binary file, when it is one.</summary>
+    [ObservableProperty]
+    private BinaryFileContents? _currentDiffPreview;
+
+    [ObservableProperty]
+    private BinaryFileContents? _commitFilePreview;
 
     /// <summary>Show diffs side by side rather than unified. Persisted.</summary>
     [ObservableProperty]
@@ -377,17 +385,39 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
             if (_commitFileDiffRequestToken != token) return;
             CommitFileDiff = diff;
+
+            CommitFilePreview = diff.IsBinary
+                ? await LoadPreviewAsync(repoPath, diff.FilePath, $"{commit.Hash}^", commit.Hash)
+                : null;
+
+            if (_commitFileDiffRequestToken != token) CommitFilePreview = null;
         }
         catch (Exception ex)
         {
             if (_commitFileDiffRequestToken != token) return;
             CommitFileDiff = null;
+            CommitFilePreview = null;
             ErrorMessage = $"Failed to load diff: {ex.Message}";
         }
         finally
         {
             if (_commitFileDiffRequestToken == token) IsLoadingCommitFileDiff = false;
         }
+    }
+
+    /// <summary>
+    /// Both sides of a binary file. A null afterRevision means the working tree
+    /// — the side no revision names.
+    /// </summary>
+    private async Task<BinaryFileContents> LoadPreviewAsync(string repoPath, string filePath, string beforeRevision, string? afterRevision)
+    {
+        var before = await _gitService.GetBlobAsync(repoPath, beforeRevision, filePath);
+
+        var after = afterRevision == null
+            ? await GitService.GetWorkingTreeBytesAsync(repoPath, filePath)
+            : await _gitService.GetBlobAsync(repoPath, afterRevision, filePath);
+
+        return new BinaryFileContents(filePath, before, after);
     }
 
     private const int MaxRecentRepositories = 10;
@@ -649,11 +679,20 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
             // The user selected another file while this one was loading.
             if (_diffRequestToken != token) return;
             CurrentDiff = diff;
+
+            // A binary file has no text to show, so the pane shows the file.
+            // Loaded only for that file, not for every change in the list.
+            CurrentDiffPreview = diff.IsBinary
+                ? await LoadPreviewAsync(repoPath, diff.FilePath, "HEAD", afterRevision: null)
+                : null;
+
+            if (_diffRequestToken != token) CurrentDiffPreview = null;
         }
         catch (Exception ex)
         {
             if (_diffRequestToken != token) return;
             CurrentDiff = null;
+            CurrentDiffPreview = null;
             ErrorMessage = $"Failed to load diff: {ex.Message}";
         }
         finally
