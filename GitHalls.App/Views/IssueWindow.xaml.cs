@@ -1,9 +1,9 @@
+using GitHalls.App.Themes;
 using GitHalls.App.ViewModels;
 using GitHalls.Core.Jira;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace GitHalls.App.Views;
@@ -68,12 +68,7 @@ public sealed partial class IssueWindow : Window
         SummaryText.Text = issue.Summary;
 
         StatusText.Text = issue.Status;
-        StatusDot.Fill = new SolidColorBrush(issue.StatusCategory switch
-        {
-            "done" => Microsoft.UI.Colors.MediumSeaGreen,
-            "indeterminate" => Microsoft.UI.Colors.SteelBlue,
-            _ => Microsoft.UI.Colors.Gray
-        });
+        StatusDot.Fill = GHBrush.JiraCategory(issue.StatusCategory);
 
         TypeText.Text = issue.Type;
         PriorityText.Text = issue.Priority ?? "—";
@@ -92,8 +87,8 @@ public sealed partial class IssueWindow : Window
         {
             var empty = issue.Description.Length == 0;
             DescriptionText.Text = empty ? "This issue has no description." : issue.Description;
-            DescriptionText.Foreground = (Brush)Application.Current.Resources[
-                empty ? "TextFillColorSecondaryBrush" : "TextFillColorPrimaryBrush"];
+            DescriptionText.Style = (Style)RootGrid.Resources[
+                empty ? "IssueBodyMutedTextStyle" : "IssueBodyTextStyle"];
         }
     }
 

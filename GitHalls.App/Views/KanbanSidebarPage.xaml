@@ -29,7 +29,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <FontIcon Grid.Column="0" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                        <FontIcon Grid.Column="0" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                                   Glyph="{x:Bind Glyph}" VerticalAlignment="Center"
                                   Visibility="{x:Bind GlyphVisibility}"
                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -39,7 +39,7 @@
                             <TextBlock Text="{x:Bind Title}"
                                        FontSize="{x:Bind FontSize}"
                                        FontWeight="{x:Bind FontWeight}"
-                                       Foreground="{x:Bind Foreground}"
+                                       Style="{x:Bind TitleStyle}"
                                        TextTrimming="CharacterEllipsis" MaxLines="1" />
                             <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource GHCaptionTextStyle}"
                                        Visibility="{x:Bind SubtitleVisibility}" MaxLines="1" />
@@ -53,9 +53,10 @@
         <StackPanel x:Name="StatePanel" Grid.Row="0" Spacing="10" Padding="24"
                     HorizontalAlignment="Center" VerticalAlignment="Center"
                     Visibility="Collapsed">
-            <TextBlock Text="&#xE71B;" FontFamily="Segoe MDL2 Assets" FontSize="28"
-                       HorizontalAlignment="Center"
-                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            <Border Style="{StaticResource GHEmptyStateTileStyle}"
+                    Background="{ThemeResource GHKanbanTintBrush}">
+                <FontIcon Glyph="&#xE71B;" FontSize="22" Foreground="{ThemeResource GHKanbanBrush}" />
+            </Border>
             <TextBlock Text="No Jira account connected yet."
                        HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -65,7 +66,7 @@
         <Button x:Name="AddQueryButton" Grid.Row="1" Margin="12,0,12,12" HorizontalAlignment="Stretch"
                 Click="AddQuery_Click">
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE710;" />
+                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE710;" />
                 <TextBlock Text="Add query" />
             </StackPanel>
         </Button>

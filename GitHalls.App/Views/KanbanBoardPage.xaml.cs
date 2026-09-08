@@ -1,9 +1,9 @@
+using GitHalls.App.Themes;
 using GitHalls.App.ViewModels;
 using GitHalls.Core.Jira;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Shapes;
 
@@ -102,18 +102,24 @@ public sealed partial class KanbanBoardPage : Page
         ConnectButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
         if (!connected)
         {
-            StateGlyph.Text = "\uE71B";   // Link
+            StateGlyph.Glyph = "\uE71B";   // Link
+            StateTile.Background = GHBrush.Get("GHKanbanTintBrush");
+            StateGlyph.Foreground = GHBrush.Get("GHKanbanBrush");
             StateText.Text = "Connect a Jira account to see your board here.";
         }
         else if (ViewModel.HasError)
         {
             // A rejected JQL lands here, and Jira says precisely what it disliked.
-            StateGlyph.Text = "\uE783";   // Error
+            StateGlyph.Glyph = "\uE783";   // Error
+            StateTile.Background = GHBrush.Get("GHDeletionTintBrush");
+            StateGlyph.Foreground = GHBrush.Get("GHDeletionBrush");
             StateText.Text = ViewModel.ErrorMessage ?? string.Empty;
         }
         else
         {
-            StateGlyph.Text = "\uE7C1";   // Flag
+            StateGlyph.Glyph = "\uE7C1";   // Flag
+            StateTile.Background = GHBrush.Get("GHKanbanTintBrush");
+            StateGlyph.Foreground = GHBrush.Get("GHKanbanBrush");
             StateText.Text = ViewModel.HasSearched
                 ? "No issues match this query. If your project has no active sprint, try another query."
                 : "Run the query to see your issues.";
@@ -159,7 +165,7 @@ public sealed partial class KanbanBoardPage : Page
         var dot = new Ellipse
         {
             Width = 8, Height = 8,
-            Fill = CategoryBrush(column.Category),
+            Fill = GHBrush.JiraCategory(column.Category),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
         };
@@ -183,7 +189,7 @@ public sealed partial class KanbanBoardPage : Page
             {
                 Text = column.Count.ToString(),
                 FontSize = 12,
-                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                Style = (Style)Resources["BoardSecondaryTextStyle"]
             }
         };
         Grid.SetColumn(count, 1);
@@ -199,7 +205,7 @@ public sealed partial class KanbanBoardPage : Page
                 Text = "Nothing here",
                 FontSize = 12,
                 Margin = new Thickness(6, 4, 0, 0),
-                Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"]
+                Style = (Style)Resources["BoardTertiaryTextStyle"]
             });
         }
 
@@ -240,7 +246,7 @@ public sealed partial class KanbanBoardPage : Page
         {
             Text = MetaLine(issue),
             FontSize = 12,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Style = (Style)Resources["BoardSecondaryTextStyle"],
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxLines = 1
         };
@@ -253,7 +259,7 @@ public sealed partial class KanbanBoardPage : Page
             {
                 Text = issue.AssigneeName,
                 FontSize = 12,
-                Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"],
+                Style = (Style)Resources["BoardTertiaryTextStyle"],
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxLines = 1
             });
@@ -297,14 +303,6 @@ public sealed partial class KanbanBoardPage : Page
         if (!string.IsNullOrWhiteSpace(issue.Priority)) parts.Add(issue.Priority);
         return string.Join(" · ", parts);
     }
-
-    /// <summary>Jira's three categories, in the colours the app already uses for state.</summary>
-    private static Brush CategoryBrush(string category) => new SolidColorBrush(category switch
-    {
-        "done" => Microsoft.UI.Colors.MediumSeaGreen,
-        "indeterminate" => Microsoft.UI.Colors.SteelBlue,
-        _ => Microsoft.UI.Colors.Gray
-    });
 
     // MARK: - Actions
 

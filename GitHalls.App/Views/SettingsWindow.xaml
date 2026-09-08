@@ -23,9 +23,8 @@
             <StackPanel Spacing="12" Padding="16,4,16,16">
 
                 <!-- MARK: Jira -->
-                <StackPanel Spacing="10" Padding="16,14" CornerRadius="8"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                            Spacing="10" Padding="16,14">
                     <TextBlock Text="Jira connection" Style="{StaticResource GHSectionHeaderTextStyle}" />
                     <TextBlock x:Name="JiraStatusText" Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap" />
 
@@ -50,9 +49,8 @@
                 </StackPanel>
 
                 <!-- MARK: Identities -->
-                <StackPanel Spacing="10" Padding="16,14" CornerRadius="8"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                            Spacing="10" Padding="16,14">
                     <TextBlock Text="Git identities" Style="{StaticResource GHSectionHeaderTextStyle}" />
                     <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
                                Text="Profiles you switch between from the toolbar. Applying one writes user.name and user.email into the open repository only, never your global config." />

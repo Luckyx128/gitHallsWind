@@ -30,7 +30,11 @@
 
         <!-- Drag region for the Window -->
         <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent" IsHitTestVisible="True">
-            <TextBlock x:Name="TitleBarText" Text="GitHalls" VerticalAlignment="Center" Margin="16,0,0,0" FontSize="12" />
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="16,0,0,0">
+                <Image Source="ms-appx:///Assets/Square44x44Logo.targetsize-16.png"
+                       Width="16" Height="16" VerticalAlignment="Center" />
+                <TextBlock x:Name="TitleBarText" Text="GitHalls" VerticalAlignment="Center" FontSize="12" />
+            </StackPanel>
         </Grid>
 
         <!-- The MenuBar that used to sit here only duplicated the toolbar
@@ -60,9 +64,24 @@
                      Settings navigation never sits on a panel of its own. -->
                 <SelectorBar x:Name="MainSelectorBar" SelectionChanged="MainSelectorBar_SelectionChanged"
                              Margin="8,4,8,0" HorizontalAlignment="Left">
-                    <SelectorBarItem x:Name="ChangesTab" Text="Changes" />
-                    <SelectorBarItem x:Name="HistoryTab" Text="History" />
-                    <SelectorBarItem x:Name="KanbanTab" Text="Kanban" />
+                    <!-- Colour here says which pane you are in, the way each row
+                         of the Settings navigation carries its own. The toolbar
+                         below stays monochrome: those are actions. -->
+                    <SelectorBarItem x:Name="ChangesTab" Text="Changes">
+                        <SelectorBarItem.Icon>
+                            <FontIcon Glyph="&#xE70F;" FontSize="15" Foreground="{ThemeResource GHChangesBrush}" />
+                        </SelectorBarItem.Icon>
+                    </SelectorBarItem>
+                    <SelectorBarItem x:Name="HistoryTab" Text="History">
+                        <SelectorBarItem.Icon>
+                            <FontIcon Glyph="&#xE81C;" FontSize="15" Foreground="{ThemeResource GHHistoryBrush}" />
+                        </SelectorBarItem.Icon>
+                    </SelectorBarItem>
+                    <SelectorBarItem x:Name="KanbanTab" Text="Kanban">
+                        <SelectorBarItem.Icon>
+                            <FontIcon Glyph="&#xE8A9;" FontSize="15" Foreground="{ThemeResource GHKanbanBrush}" />
+                        </SelectorBarItem.Icon>
+                    </SelectorBarItem>
                 </SelectorBar>
 
                 <Frame x:Name="SidebarFrame" Grid.Row="1" />
@@ -86,7 +105,7 @@
                         <!-- Left edge lines up with the cards below it (12px). -->
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0,0,0" Height="48">
                             <Button x:Name="ToggleSidebarButton" Click="ToggleSidebar_Click"
-                                    Content="&#xE700;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                    Content="&#xE700;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                                     Width="36" Height="32" Padding="0"
                                     ToolTipService.ToolTip="Toggle sidebar (Ctrl+B)" />
 
@@ -129,7 +148,7 @@
                             <DropDownButton x:Name="IdentityButton" Height="32" MaxWidth="180"
                                             HorizontalContentAlignment="Left">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE77B;" />
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE77B;" />
                                     <TextBlock x:Name="IdentityButtonText" Text="Identity"
                                                TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 </StackPanel>
@@ -156,13 +175,13 @@
                                     HorizontalContentAlignment="Left"
                                     Command="{x:Bind ViewModel.SyncCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                                               Glyph="{x:Bind ViewModel.SyncGlyph, Mode=OneWay}" />
                                     <TextBlock Text="{x:Bind ViewModel.SyncTitle, Mode=OneWay}" />
                                 </StackPanel>
                             </Button>
 
-                            <Button Content="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                            <Button Content="&#xE895;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                                     Width="36" Height="32" Padding="0"
                                     Command="{x:Bind ViewModel.FetchCommand}"
                                     ToolTipService.ToolTip="Fetch from remote" />

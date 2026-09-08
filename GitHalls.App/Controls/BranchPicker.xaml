@@ -36,7 +36,7 @@
                         <TextBlock Grid.Column="0" Text="{x:Bind Text}"
                                    FontSize="{x:Bind FontSize}"
                                    FontWeight="{x:Bind FontWeight}"
-                                   Foreground="{x:Bind Foreground}"
+                                   Style="{x:Bind TitleStyle}"
                                    TextTrimming="CharacterEllipsis" MaxLines="1"
                                    VerticalAlignment="Center"
                                    ToolTipService.ToolTip="{x:Bind Text}" />

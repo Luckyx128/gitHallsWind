@@ -8,7 +8,22 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="RootGrid">
+        <Grid.Resources>
+            <!--
+                Text set in code carries a Style rather than a Brush. A Brush
+                pulled from the resources is one instance of one theme, and it
+                keeps painting that theme after the user switches; the
+                {ThemeResource} inside a Setter is re-resolved on the element.
+            -->
+            <Style x:Key="IssueBodyTextStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+            </Style>
+            <Style x:Key="IssueBodyMutedTextStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Style>
+        </Grid.Resources>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />
             <RowDefinition Height="*" />
@@ -22,9 +37,8 @@
             <StackPanel Spacing="12" Padding="16,4,16,16">
 
                 <!-- MARK: The issue -->
-                <StackPanel Spacing="10" Padding="16,14" CornerRadius="8"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                            Spacing="10" Padding="16,14">
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -111,9 +125,8 @@
                 </StackPanel>
 
                 <!-- MARK: Description -->
-                <StackPanel Spacing="8" Padding="16,14" CornerRadius="8"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                            Spacing="8" Padding="16,14">
                     <Grid>
                         <TextBlock Text="Description" Style="{StaticResource GHSectionHeaderTextStyle}" />
                         <ProgressRing x:Name="DescriptionRing" Width="16" Height="16" IsActive="False"
@@ -127,9 +140,8 @@
                 </StackPanel>
 
                 <!-- MARK: Branch — the one place Jira and git meet. -->
-                <StackPanel Spacing="8" Padding="16,14" CornerRadius="8"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                            Spacing="8" Padding="16,14">
                     <TextBlock Text="Create a branch from this issue" Style="{StaticResource GHSectionHeaderTextStyle}" />
 
                     <Grid ColumnSpacing="8">
@@ -148,7 +160,7 @@
                                  KeyDown="BranchName_KeyDown" />
 
                         <Button x:Name="ResetNameButton" Grid.Column="1" Width="32" Height="32" Padding="0"
-                                Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                Content="&#xE72C;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                                 Click="ResetName_Click"
                                 ToolTipService.ToolTip="Back to the suggested name" />
 

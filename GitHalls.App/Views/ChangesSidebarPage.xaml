@@ -8,7 +8,8 @@
     Background="Transparent">
 
     <Page.Resources>
-        <converters:StringToBrushConverter x:Key="ColorConverter" />
+        <converters:FileStatusToBrushConverter x:Key="StatusBrush" />
+        <converters:FileStatusToBrushConverter x:Key="StatusTint" Tint="True" />
     </Page.Resources>
 
     <Grid>
@@ -35,7 +36,7 @@
                       VerticalAlignment="Center" />
 
             <Button Grid.Column="1"
-                    Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                    Content="&#xE74D;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                     Width="32" Height="32" Padding="0"
                     IsEnabled="{x:Bind ViewModel.HasSelectedChange, Mode=OneWay}"
                     Click="DiscardButton_Click"
@@ -71,9 +72,10 @@
                             <TextBlock Text="{x:Bind DirectoryPath}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
                         </StackPanel>
 
-                        <Border Grid.Column="2" Background="{x:Bind BadgeColorHex, Converter={StaticResource ColorConverter}}"
-                                CornerRadius="3" Padding="6,1" VerticalAlignment="Center">
-                            <TextBlock Text="{x:Bind BadgeLetter}" FontSize="11" FontWeight="SemiBold" Foreground="White" />
+                        <Border Grid.Column="2" Style="{StaticResource GHStatusBadgeStyle}"
+                                Background="{x:Bind BadgeStatus, Converter={StaticResource StatusTint}}">
+                            <TextBlock Text="{x:Bind BadgeLetter}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{x:Bind BadgeStatus, Converter={StaticResource StatusBrush}}" />
                         </Border>
                     </Grid>
                 </DataTemplate>
@@ -81,9 +83,8 @@
         </ListView>
 
         <!-- The composer is a card, not a footer fenced off by a rule. -->
-        <StackPanel Grid.Row="2" Spacing="8" Margin="8,4,8,8" Padding="12" CornerRadius="8"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+        <StackPanel Grid.Row="2" Style="{StaticResource GHCardPanelStyle}"
+                    Spacing="8" Margin="8,4,8,8" Padding="12">
 
             <!-- Conventional Commits: the type and scope build the "type(scope): "
                  prefix of the summary, so the text stays editable by hand. -->
@@ -105,7 +106,7 @@
                          LostFocus="CommitScope_Committed" KeyDown="CommitScope_KeyDown" />
 
                 <Button Grid.Column="2" Width="32" Height="32" Padding="0"
-                        Content="&#xE9CE;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                        Content="&#xE9CE;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                         ToolTipService.ToolTip="Conventional Commits reference">
                     <Button.Flyout>
                         <Flyout>

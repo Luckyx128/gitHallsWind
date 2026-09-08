@@ -49,9 +49,7 @@ public sealed partial class ChangesSidebarPage : Page
             entry.Children.Add(new TextBlock
             {
                 Text = type.Description,
-                FontSize = 12,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                Style = (Style)Application.Current.Resources["GHBodyMutedTextStyle"]
             });
             CommitTypeReference.Children.Add(entry);
         }

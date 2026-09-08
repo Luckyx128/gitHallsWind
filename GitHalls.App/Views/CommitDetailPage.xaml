@@ -9,15 +9,17 @@
     Background="Transparent">
 
     <Page.Resources>
-        <converters:StringToBrushConverter x:Key="ColorConverter" />
+        <converters:FileStatusToBrushConverter x:Key="StatusBrush" />
+        <converters:FileStatusToBrushConverter x:Key="StatusTint" Tint="True" />
     </Page.Resources>
 
     <Grid>
         <!-- Empty / loading states, mirroring the Swift ContentUnavailableView -->
         <StackPanel x:Name="PlaceholderPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-            <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="32"
-                       HorizontalAlignment="Center"
-                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            <Border Style="{StaticResource GHEmptyStateTileStyle}"
+                    Background="{ThemeResource GHHistoryTintBrush}">
+                <FontIcon Glyph="&#xE823;" FontSize="22" Foreground="{ThemeResource GHHistoryBrush}" />
+            </Border>
             <TextBlock x:Name="PlaceholderText" Text="Select a commit"
                        HorizontalAlignment="Center"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -33,9 +35,8 @@
 
             <!-- The commit itself reads as one Settings card: title, muted
                  supporting line, optional body. -->
-            <StackPanel Grid.Row="0" Spacing="6" Padding="16,12" CornerRadius="8"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <StackPanel Grid.Row="0" Style="{StaticResource GHCardPanelStyle}"
+                        Spacing="6" Padding="16,12">
                 <TextBlock x:Name="SummaryText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock x:Name="AuthorText" Style="{StaticResource GHCaptionTextStyle}" />
@@ -85,9 +86,10 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Grid.Column="0" Background="{x:Bind BadgeColorHex, Converter={StaticResource ColorConverter}}"
-                                                CornerRadius="3" Padding="6,1" VerticalAlignment="Center">
-                                            <TextBlock Text="{x:Bind BadgeLetter}" FontSize="11" FontWeight="SemiBold" Foreground="White" />
+                                        <Border Grid.Column="0" Style="{StaticResource GHStatusBadgeStyle}"
+                                                Background="{x:Bind Status, Converter={StaticResource StatusTint}}">
+                                            <TextBlock Text="{x:Bind BadgeLetter}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{x:Bind Status, Converter={StaticResource StatusBrush}}" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center"
@@ -97,8 +99,8 @@
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                            <TextBlock Text="{x:Bind AdditionsText}" FontSize="12" Foreground="#4CAF50" />
-                                            <TextBlock Text="{x:Bind DeletionsText}" FontSize="12" Foreground="#F44336" />
+                                            <TextBlock Text="{x:Bind AdditionsText}" FontSize="12" Foreground="{ThemeResource GHAdditionBrush}" />
+                                            <TextBlock Text="{x:Bind DeletionsText}" FontSize="12" Foreground="{ThemeResource GHDeletionBrush}" />
                                         </StackPanel>
                                     </Grid>
                                 </DataTemplate>

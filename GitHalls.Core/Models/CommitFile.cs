@@ -41,7 +41,6 @@ public class CommitFile
     public string DirectoryPath => System.IO.Path.GetDirectoryName(Path)?.Replace('\\', '/') ?? string.Empty;
 
     public string BadgeLetter => FileStatusBadge.Letter(Status);
-    public string BadgeColorHex => FileStatusBadge.ColorHex(Status);
 
     /// <summary>Line counts for the list row. Empty for a binary file, which has none.</summary>
     public string AdditionsText => IsBinary ? string.Empty : $"+{Additions}";

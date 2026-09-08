@@ -61,19 +61,26 @@ public sealed class DiffTextTheme
 
     public static DiffTextTheme For(ElementTheme theme) => theme == ElementTheme.Dark ? Dark : Light;
 
+    // The addition and deletion values below are GHAdditionColor and
+    // GHDeletionColor from Styles/AppStyles.xaml, which is where the palette is
+    // decided; change them there first. They are repeated here rather than read
+    // from the ResourceDictionary because DiffTextView builds a SolidColorBrush
+    // per rendered line, and a resource lookup on that path is exactly the cost
+    // MaxRenderedLines exists to avoid.
+
     public static readonly DiffTextTheme Light = new()
     {
         ViewBackground = Color.FromArgb(255, 255, 255, 255),
         BaseText = Color.FromArgb(255, 33, 33, 33),
         HunkHeaderText = Color.FromArgb(255, 102, 102, 102),
         HunkHeaderBackground = Color.FromArgb(23, 51, 115, 230),
-        AdditionBackground = Color.FromArgb(38, 56, 184, 77),
-        DeletionBackground = Color.FromArgb(36, 230, 61, 61),
+        AdditionBackground = Color.FromArgb(38, 10, 107, 10),
+        DeletionBackground = Color.FromArgb(36, 188, 40, 25),
         GutterBackground = Color.FromArgb(255, 246, 246, 246),
         GutterText = Color.FromArgb(255, 148, 148, 148),
         GutterSeparator = Color.FromArgb(255, 219, 219, 219),
-        AdditionMarker = Color.FromArgb(255, 41, 153, 61),
-        DeletionMarker = Color.FromArgb(255, 204, 46, 46),
+        AdditionMarker = Color.FromArgb(255, 10, 107, 10),    // GHAdditionColor #0A6B0A
+        DeletionMarker = Color.FromArgb(255, 188, 40, 25),    // GHDeletionColor #BC2819
         SearchHighlight = Color.FromArgb(120, 255, 214, 0),
         Tokens = new Dictionary<DiffTokenKind, Color>
         {
@@ -95,13 +102,13 @@ public sealed class DiffTextTheme
         BaseText = Color.FromArgb(255, 224, 224, 224),
         HunkHeaderText = Color.FromArgb(255, 158, 158, 158),
         HunkHeaderBackground = Color.FromArgb(41, 89, 140, 255),
-        AdditionBackground = Color.FromArgb(41, 77, 217, 102),
-        DeletionBackground = Color.FromArgb(41, 255, 89, 89),
+        AdditionBackground = Color.FromArgb(41, 108, 203, 95),
+        DeletionBackground = Color.FromArgb(41, 255, 153, 164),
         GutterBackground = Color.FromArgb(255, 37, 38, 45),
         GutterText = Color.FromArgb(255, 122, 122, 122),
         GutterSeparator = Color.FromArgb(255, 77, 77, 77),
-        AdditionMarker = Color.FromArgb(255, 102, 217, 115),
-        DeletionMarker = Color.FromArgb(255, 255, 115, 115),
+        AdditionMarker = Color.FromArgb(255, 108, 203, 95),   // GHAdditionColor #6CCB5F
+        DeletionMarker = Color.FromArgb(255, 255, 153, 164),  // GHDeletionColor #FF99A4
         SearchHighlight = Color.FromArgb(120, 255, 193, 7),
         Tokens = new Dictionary<DiffTokenKind, Color>
         {

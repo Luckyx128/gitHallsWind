@@ -45,8 +45,13 @@ public sealed class QueryRow
     public Visibility GlyphVisibility => IsHeader ? Visibility.Collapsed : Visibility.Visible;
     public Visibility SubtitleVisibility => Subtitle.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
-    public Brush Foreground => (Brush)Application.Current.Resources[
-        IsHeader ? "TextFillColorSecondaryBrush" : "TextFillColorPrimaryBrush"];
+    /// <summary>
+    /// A Style, not a Brush. A Brush read out of the resources here is one
+    /// theme's instance and the row goes on painting it after the user
+    /// switches; the {ThemeResource} in the Style's setter is re-resolved.
+    /// </summary>
+    public Style TitleStyle => (Style)Application.Current.Resources[
+        IsHeader ? "GHRowHeaderTextStyle" : "GHRowTitleTextStyle"];
 }
 
 /// <summary>
@@ -200,9 +205,7 @@ internal static class QueryDialog
         var hint = new TextBlock
         {
             Text = "Jira Query Language, exactly as in Jira's own search. currentUser() and openSprints() work here too.",
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = 12,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            Style = (Style)Application.Current.Resources["GHBodyMutedTextStyle"]
         };
 
         var dialog = new ContentDialog

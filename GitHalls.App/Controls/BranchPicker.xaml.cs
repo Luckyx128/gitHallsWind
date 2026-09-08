@@ -3,7 +3,6 @@ using GitHalls.Core.Models;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Windows.UI.Text;
 using System.Collections.ObjectModel;
 
@@ -28,8 +27,10 @@ public sealed class BranchListItem
     public FontWeight FontWeight => IsHeader || IsCurrent ? FontWeights.SemiBold : FontWeights.Normal;
     public Visibility CheckVisibility => IsCurrent ? Visibility.Visible : Visibility.Collapsed;
 
-    public Brush Foreground => (Brush)Application.Current.Resources[
-        IsHeader ? "TextFillColorSecondaryBrush" : "TextFillColorPrimaryBrush"];
+    /// <summary>A Style, not a Brush: see GHBrush on why a captured brush goes
+    /// stale when the user switches theme.</summary>
+    public Style TitleStyle => (Style)Application.Current.Resources[
+        IsHeader ? "GHRowHeaderTextStyle" : "GHRowTitleTextStyle"];
 }
 
 /// <summary>How a click on a branch behaves.</summary>

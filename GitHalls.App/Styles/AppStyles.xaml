@@ -12,6 +12,129 @@
              a full-bleed band.
     -->
 
+    <!--
+        MARK: - Palette
+
+        Every colour the app calls its own is defined here and nowhere else.
+        Before this there were three: #4CAF50/#F44336 in the XAML, #28A745/#D73A49
+        in FileStatusBadge, and a third pair in DiffTextTheme — three different
+        greens could land on one screen.
+
+        The hues answer to two things. The greens, reds and the blue are the
+        Windows 11 system fill colours (SystemFillColorSuccess / Critical and the
+        Win11 accent), so a GitHalls badge reads like a Windows badge. The violet
+        and the blue of the destinations are the two ends of the app icon's
+        gradient (#4A8CFF to #7E3CEC), pulled to a value that passes 4.5:1 as
+        text on its own theme's surface — the icon's own blue does not.
+
+        Each hue comes as a pair: the Brush is what a glyph or a letter is
+        painted in, the TintBrush is what sits behind it. The pairing is what
+        fixes the values. The badge letter is 11px, which WCAG counts as small
+        text, so every hue has to clear 4.5:1 against its own tint over the card
+        fill — not just against the card. That is why the tint is 12% and not the
+        more obvious 18%, and why the light green and red are a step darker than
+        the Windows system fills they otherwise copy: at 18% the green landed on
+        4.00:1. The three colours that are only ever a glyph (the destinations)
+        only have to clear 3:1.
+    -->
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- Dark. Lifted and desaturated: the same hue at its light value
+             disappears into Mica. -->
+        <ResourceDictionary x:Key="Default">
+            <Color x:Key="GHAdditionColor">#6CCB5F</Color>
+            <Color x:Key="GHDeletionColor">#FF99A4</Color>
+            <Color x:Key="GHModifiedColor">#60A5FF</Color>
+            <Color x:Key="GHRenamedColor">#B69CFF</Color>
+            <Color x:Key="GHConflictColor">#F0918A</Color>
+            <Color x:Key="GHNeutralColor">#ADB4BC</Color>
+            <Color x:Key="GHKanbanColor">#4FD1C5</Color>
+
+            <SolidColorBrush x:Key="GHAdditionBrush" Color="{StaticResource GHAdditionColor}" />
+            <SolidColorBrush x:Key="GHDeletionBrush" Color="{StaticResource GHDeletionColor}" />
+            <SolidColorBrush x:Key="GHModifiedBrush" Color="{StaticResource GHModifiedColor}" />
+            <SolidColorBrush x:Key="GHRenamedBrush" Color="{StaticResource GHRenamedColor}" />
+            <SolidColorBrush x:Key="GHConflictBrush" Color="{StaticResource GHConflictColor}" />
+            <SolidColorBrush x:Key="GHNeutralBrush" Color="{StaticResource GHNeutralColor}" />
+
+            <SolidColorBrush x:Key="GHAdditionTintBrush" Color="{StaticResource GHAdditionColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHDeletionTintBrush" Color="{StaticResource GHDeletionColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHModifiedTintBrush" Color="{StaticResource GHModifiedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHRenamedTintBrush" Color="{StaticResource GHRenamedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHConflictTintBrush" Color="{StaticResource GHConflictColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHNeutralTintBrush" Color="{StaticResource GHNeutralColor}" Opacity="0.12" />
+
+            <!-- The three destinations. Changes and History are the icon's two
+                 ends; Kanban is the teal Settings gives "Rede e Internet". -->
+            <SolidColorBrush x:Key="GHChangesBrush" Color="{StaticResource GHModifiedColor}" />
+            <SolidColorBrush x:Key="GHHistoryBrush" Color="{StaticResource GHRenamedColor}" />
+            <SolidColorBrush x:Key="GHKanbanBrush" Color="{StaticResource GHKanbanColor}" />
+            <SolidColorBrush x:Key="GHChangesTintBrush" Color="{StaticResource GHModifiedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHHistoryTintBrush" Color="{StaticResource GHRenamedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHKanbanTintBrush" Color="{StaticResource GHKanbanColor}" Opacity="0.12" />
+        </ResourceDictionary>
+
+        <!-- Light. Darker than the icon's own hues, which fail as text on white. -->
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="GHAdditionColor">#0A6B0A</Color>
+            <Color x:Key="GHDeletionColor">#BC2819</Color>
+            <Color x:Key="GHModifiedColor">#005FB8</Color>
+            <Color x:Key="GHRenamedColor">#6B2FBF</Color>
+            <Color x:Key="GHConflictColor">#8E1F14</Color>
+            <Color x:Key="GHNeutralColor">#5D6169</Color>
+            <Color x:Key="GHKanbanColor">#0A7C74</Color>
+
+            <SolidColorBrush x:Key="GHAdditionBrush" Color="{StaticResource GHAdditionColor}" />
+            <SolidColorBrush x:Key="GHDeletionBrush" Color="{StaticResource GHDeletionColor}" />
+            <SolidColorBrush x:Key="GHModifiedBrush" Color="{StaticResource GHModifiedColor}" />
+            <SolidColorBrush x:Key="GHRenamedBrush" Color="{StaticResource GHRenamedColor}" />
+            <SolidColorBrush x:Key="GHConflictBrush" Color="{StaticResource GHConflictColor}" />
+            <SolidColorBrush x:Key="GHNeutralBrush" Color="{StaticResource GHNeutralColor}" />
+
+            <SolidColorBrush x:Key="GHAdditionTintBrush" Color="{StaticResource GHAdditionColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHDeletionTintBrush" Color="{StaticResource GHDeletionColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHModifiedTintBrush" Color="{StaticResource GHModifiedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHRenamedTintBrush" Color="{StaticResource GHRenamedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHConflictTintBrush" Color="{StaticResource GHConflictColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHNeutralTintBrush" Color="{StaticResource GHNeutralColor}" Opacity="0.12" />
+
+            <SolidColorBrush x:Key="GHChangesBrush" Color="{StaticResource GHModifiedColor}" />
+            <SolidColorBrush x:Key="GHHistoryBrush" Color="{StaticResource GHRenamedColor}" />
+            <SolidColorBrush x:Key="GHKanbanBrush" Color="{StaticResource GHKanbanColor}" />
+            <SolidColorBrush x:Key="GHChangesTintBrush" Color="{StaticResource GHModifiedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHHistoryTintBrush" Color="{StaticResource GHRenamedColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="GHKanbanTintBrush" Color="{StaticResource GHKanbanColor}" Opacity="0.12" />
+        </ResourceDictionary>
+
+        <!-- High contrast has no palette: hue is exactly what the user turned
+             off. Everything collapses onto the system pair, and the tints go
+             away so a badge is read from its letter and not its fill. -->
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="GHAdditionBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="GHDeletionBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="GHModifiedBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="GHRenamedBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="GHConflictBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="GHNeutralBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+
+            <SolidColorBrush x:Key="GHAdditionTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHDeletionTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHModifiedTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHRenamedTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHConflictTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHNeutralTintBrush" Color="Transparent" />
+
+            <SolidColorBrush x:Key="GHChangesBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="GHHistoryBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="GHKanbanBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="GHChangesTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHHistoryTintBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="GHKanbanTintBrush" Color="Transparent" />
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
     <!-- MARK: - Surfaces -->
 
     <!-- The card that groups a block of content, as in "Configurações recomendadas". -->
@@ -28,11 +151,52 @@
         <Setter Property="Padding" Value="0" />
     </Style>
 
+    <!-- The same card as a StackPanel. GHCardStyle only targets Border, so the
+         panels that are themselves the card (the commit composer, the Settings
+         and issue sections) were repeating these four setters inline. -->
+    <Style x:Key="GHCardPanelStyle" TargetType="StackPanel">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16,12,16,12" />
+    </Style>
+
     <!-- A nested surface inside a card (a badge, an inline chip). -->
     <Style x:Key="GHChipStyle" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
         <Setter Property="CornerRadius" Value="4" />
         <Setter Property="Padding" Value="10,4" />
+    </Style>
+
+    <!-- The status letter of a file. Not a pill: 3px and 6,1, so it reads as a
+         tag beside a filename and not as a button. The fill is the status hue
+         at low opacity and the letter is the hue itself — a solid fill would
+         need white text, and white only survives one of the two themes. -->
+    <Style x:Key="GHStatusBadgeStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="6,1" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- MARK: - Glyph tiles -->
+
+    <!-- A destination's glyph sits on a tinted square, the way each row of the
+         Settings navigation carries its own colour. Actions never get one:
+         colour here means "where you are", not "what this does". -->
+    <Style x:Key="GHGlyphTileStyle" TargetType="Border">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <!-- The same tile at the size an empty pane needs. -->
+    <Style x:Key="GHEmptyStateTileStyle" TargetType="Border" BasedOn="{StaticResource GHGlyphTileStyle}">
+        <Setter Property="Width" Value="48" />
+        <Setter Property="Height" Value="48" />
+        <Setter Property="CornerRadius" Value="8" />
     </Style>
 
     <!-- MARK: - Type ramp -->
@@ -50,11 +214,31 @@
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
+    <!-- A row's own title, and the heading that groups rows. Styles rather than
+         brushes: a list row built or bound from code cannot use {ThemeResource}
+         directly, and a Brush captured from the resources keeps its theme. -->
+    <Style x:Key="GHRowTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="GHRowHeaderTextStyle" TargetType="TextBlock" BasedOn="{StaticResource GHRowTitleTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Style>
+
     <!-- Supporting line under a title. -->
     <Style x:Key="GHCaptionTextStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- Muted prose that wraps: the Conventional Commits reference and the JQL
+         hint. GHCaptionTextStyle trims to one line, which those two are not. -->
+    <Style x:Key="GHBodyMutedTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <!-- MARK: - Lists -->

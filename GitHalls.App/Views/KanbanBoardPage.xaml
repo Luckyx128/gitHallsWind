@@ -4,6 +4,23 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="Transparent">
 
+    <Page.Resources>
+    <!--
+        Text built in code carries a Style rather than a Brush. A Brush pulled
+        from the resources is one instance of one theme, and it keeps painting
+        that theme after the user switches; the {ThemeResource} inside a Setter
+        is re-resolved on the element instead.
+    -->
+        <Style x:Key="BoardSecondaryTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="BoardTertiaryTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+        </Style>
+    </Page.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -34,7 +51,7 @@
                           IsActive="False" Visibility="Collapsed" VerticalAlignment="Center" />
 
             <Button Grid.Column="3" Width="32" Height="32" Padding="0"
-                    Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                    Content="&#xE72C;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                     Click="Refresh_Click"
                     ToolTipService.ToolTip="Run the query again" />
         </Grid>
@@ -59,9 +76,11 @@
         <StackPanel x:Name="StatePanel" Grid.Row="2" Spacing="10" Padding="24"
                     HorizontalAlignment="Center" VerticalAlignment="Center"
                     Visibility="Collapsed">
-            <TextBlock x:Name="StateGlyph" Text="&#xE71B;" FontFamily="Segoe MDL2 Assets" FontSize="32"
-                       HorizontalAlignment="Center"
-                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            <Border x:Name="StateTile" Style="{StaticResource GHEmptyStateTileStyle}"
+                    Background="{ThemeResource GHKanbanTintBrush}">
+                <FontIcon x:Name="StateGlyph" Glyph="&#xE71B;" FontSize="22"
+                          Foreground="{ThemeResource GHKanbanBrush}" />
+            </Border>
             <TextBlock x:Name="StateText" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        MaxWidth="420"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
