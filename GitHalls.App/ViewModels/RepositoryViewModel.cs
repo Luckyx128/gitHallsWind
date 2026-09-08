@@ -137,42 +137,41 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     /// <summary>Ahead/behind the upstream. Both zero and <see cref="HasUpstream"/> true means up to date.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
+    [NotifyPropertyChangedFor(nameof(CurrentSyncAction), nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
     private int _syncAhead;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
+    [NotifyPropertyChangedFor(nameof(CurrentSyncAction), nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
     private int _syncBehind;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
+    [NotifyPropertyChangedFor(nameof(CurrentSyncAction), nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
     private bool _hasUpstream;
 
-    /// <summary>Label of the single sync button. Port of SyncButton.swift.</summary>
-    public string SyncTitle
-    {
-        get
-        {
-            if (!HasUpstream) return "Publish Branch";
-            if (SyncAhead > 0) return $"Push ({SyncAhead})";
-            if (SyncBehind > 0) return $"Pull ({SyncBehind})";
-            return "Up to date";
-        }
-    }
+    /// <summary>What the sync button does in the current state.</summary>
+    public SyncAction CurrentSyncAction => BranchSync.ActionFor(HasUpstream, SyncAhead, SyncBehind);
 
-    public string SyncGlyph
+    /// <summary>Label of the single sync button. Port of SyncButton.swift.</summary>
+    public string SyncTitle => CurrentSyncAction switch
     {
-        get
-        {
-            if (!HasUpstream || SyncAhead > 0) return "\uE898"; // Upload
-            if (SyncBehind > 0) return "\uE896";                // Download
-            return "\uE73E";                                    // Checkmark
-        }
-    }
+        SyncAction.Publish => "Publish Branch",
+        SyncAction.Push => $"Push ({SyncAhead})",
+        SyncAction.Pull => $"Pull ({SyncBehind})",
+        SyncAction.PullThenPush => $"Sync (\u2193{SyncBehind} \u2191{SyncAhead})",
+        _ => "Up to date",
+    };
+
+    public string SyncGlyph => CurrentSyncAction switch
+    {
+        SyncAction.Publish or SyncAction.Push => "\uE898",  // Upload
+        SyncAction.Pull => "\uE896",                        // Download
+        SyncAction.PullThenPush => "\uE895",                // Sync
+        _ => "\uE73E",                                      // Checkmark
+    };
 
     /// <summary>Up to date is a state, not an action — the button says so and stays disabled.</summary>
     public bool CanSync => !IsBusy && !string.IsNullOrEmpty(RepositoryPath)
-        && (!HasUpstream || SyncAhead > 0 || SyncBehind > 0);
+        && CurrentSyncAction != SyncAction.UpToDate;
 
     /// <summary>
     /// Tri-state for the "stage all" checkbox: true = everything staged,
@@ -882,24 +881,63 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     public async Task PushAsync()
     {
         var publish = !HasUpstream;
-        await RunGitAsync(path => publish ? _gitService.PushPublishAsync(path) : _gitService.PushAsync(path));
+        await RunGitAsync(async path =>
+        {
+            try
+            {
+                if (publish) await _gitService.PushPublishAsync(path);
+                else await _gitService.PushAsync(path);
+            }
+            catch (GitException ex) when (IsRejectedForNewRemoteWork(ex))
+            {
+                // The ahead/behind counts are only as fresh as the last fetch, so
+                // a push can be the first thing to learn the remote moved. Fetch
+                // before giving up: the refresh that follows turns the button into
+                // the sync that will actually work.
+                await _gitService.FetchAsync(path);
+                _lastFetch = DateTimeOffset.UtcNow;
+                throw;
+            }
+        });
     }
 
     /// <summary>
+    /// A push git refused because the upstream has commits this clone has never
+    /// seen — the one rejection that a fetch changes the answer to.
+    /// </summary>
+    private static bool IsRejectedForNewRemoteWork(GitException ex) =>
+        ex.RawError.Contains("fetch first", StringComparison.OrdinalIgnoreCase)
+        || ex.RawError.Contains("non-fast-forward", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// The one action the sync button performs, chosen from the current state.
-    /// Push wins when the branch is both ahead and behind: pushing first is what
-    /// surfaces the conflict, rather than quietly merging into your work.
+    ///
+    /// A diverged branch pulls before it pushes: git rejects a non-fast-forward
+    /// push, so preferring push there left the button doing nothing but printing
+    /// a rejection. Both run inside one operation so a merge that stops on a
+    /// conflict stops the push with it.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSync))]
     public async Task SyncAsync()
     {
-        if (!HasUpstream || SyncAhead > 0)
+        switch (CurrentSyncAction)
         {
-            await PushAsync();
-        }
-        else if (SyncBehind > 0)
-        {
-            await PullAsync();
+            case SyncAction.Publish:
+            case SyncAction.Push:
+                await PushAsync();
+                break;
+
+            case SyncAction.Pull:
+                await PullAsync();
+                break;
+
+            case SyncAction.PullThenPush:
+                await RunGitAsync(async path =>
+                {
+                    await _gitService.PullDivergentAsync(path);
+                    await _gitService.PushAsync(path);
+                });
+                break;
         }
     }
 

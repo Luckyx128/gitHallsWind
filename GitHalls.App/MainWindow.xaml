@@ -148,7 +148,8 @@
                             </DropDownButton>
 
                             <!-- One button whose label states what is actually needed:
-                                 Push (N) / Pull (N) / Publish Branch / Up to date.
+                                 Push (N) / Pull (N) / Sync (down/up, when the
+                                 branch diverged) / Publish Branch / Up to date.
                                  Port of SyncButton.swift. -->
                             <Button x:Name="SyncButton" Height="32" MinWidth="130"
                                     Style="{StaticResource AccentButtonStyle}"
