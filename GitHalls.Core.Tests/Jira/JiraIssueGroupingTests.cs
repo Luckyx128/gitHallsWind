@@ -9,8 +9,9 @@ public class JiraIssueGroupingTests
         new(key, key, status, category, "Task", null, DateTimeOffset.UnixEpoch);
 
     [Fact]
-    public void ByStatus_KeepsTheOrderJiraReturned()
+    public void ByStatus_RunsTheColumnsInWorkflowOrder()
     {
+        // Rank order interleaves statuses; the board still reads left to right.
         var groups = JiraIssueGrouping.ByStatus(new[]
         {
             Issue("A-1", "In Progress", "indeterminate"),
@@ -19,9 +20,46 @@ public class JiraIssueGroupingTests
         });
 
         Assert.Equal(2, groups.Count);
-        Assert.Equal("In Progress", groups[0].Status);
-        Assert.Equal(2, groups[0].Count);
-        Assert.Equal("To Do", groups[1].Status);
+        Assert.Equal("To Do", groups[0].Status);
+        Assert.Equal("In Progress", groups[1].Status);
+        Assert.Equal(2, groups[1].Count);
+    }
+
+    [Fact]
+    public void ByStatus_KeepsTheOrderJiraReturnedWithinACategory()
+    {
+        var groups = JiraIssueGrouping.ByStatus(new[]
+        {
+            Issue("A-1", "In Review", "indeterminate"),
+            Issue("A-2", "In Progress", "indeterminate"),
+            Issue("A-3", "Selected", "new"),
+            Issue("A-4", "To Do", "new")
+        });
+
+        Assert.Equal(new[] { "Selected", "To Do", "In Review", "In Progress" }, groups.Select(g => g.Status));
+    }
+
+    [Fact]
+    public void Filter_KeepsEveryColumnAndOnlyTheMatchingCards()
+    {
+        var groups = JiraIssueGrouping.ByStatus(new[]
+        {
+            new JiraIssue("APP-1", "Login screen", "To Do", "new", "Task", null, DateTimeOffset.UnixEpoch),
+            new JiraIssue("APP-2", "Kanban board", "To Do", "new", "Task", null, DateTimeOffset.UnixEpoch),
+            new JiraIssue("APP-3", "Crash on login", "Done", "done", "Bug", null, DateTimeOffset.UnixEpoch)
+        });
+
+        var filtered = JiraIssueGrouping.Filter(groups, "login");
+
+        Assert.Equal(2, filtered.Count);
+        Assert.Equal(new[] { "APP-1" }, filtered[0].Issues.Select(i => i.Key));
+        Assert.Equal(new[] { "APP-3" }, filtered[1].Issues.Select(i => i.Key));
+
+        // The key matches too, case aside.
+        Assert.Equal(new[] { "APP-2" }, JiraIssueGrouping.Filter(groups, "app-2")[0].Issues.Select(i => i.Key));
+
+        // Blank means no filter — the very same list, not a copy.
+        Assert.Same(groups, JiraIssueGrouping.Filter(groups, "  "));
     }
 
     [Fact]

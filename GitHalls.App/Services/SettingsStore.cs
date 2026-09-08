@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GitHalls.Core.Jira;
 using GitHalls.Core.Models;
 
 namespace GitHalls.App.Services;
@@ -16,6 +17,12 @@ public class AppSettings
     /// the Windows Credential Manager, see <see cref="JiraAccountStore"/>.</summary>
     public string? JiraSite { get; set; }
     public string JiraEmail { get; set; } = string.Empty;
+
+    /// <summary>Queries the user wrote. The presets are code (<see cref="JiraQueryPresets"/>), not settings.</summary>
+    public List<JiraQuery> JiraCustomQueries { get; set; } = new();
+
+    /// <summary>Which query the board showed last, preset or custom.</summary>
+    public string? JiraSelectedQueryId { get; set; }
 
     /// <summary>Saved git identities the user switches between.</summary>
     public List<GitIdentity> GitIdentities { get; set; } = new();

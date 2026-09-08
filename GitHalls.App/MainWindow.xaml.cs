@@ -25,12 +25,15 @@ public sealed partial class MainWindow : Window
     /// <summary>Open settings window, if any — a second one would fight the first.</summary>
     private SettingsWindow? _settingsWindow;
 
+    /// <summary>Open issue windows by key: clicking a card twice brings the window forward, not a twin.</summary>
+    private readonly Dictionary<string, IssueWindow> _issueWindows = new(StringComparer.Ordinal);
+
     /// <summary>Sidebar width to restore when it is expanded again.</summary>
     private double _restoreSidebarWidth = 280;
 
     public RepositoryViewModel ViewModel { get; }
 
-    /// <summary>Jira state, separate from the repository's. They meet only in the issue detail pane.</summary>
+    /// <summary>Jira state, separate from the repository's. They meet only in the issue window.</summary>
     public JiraViewModel JiraViewModel { get; }
 
     public MainWindow()
@@ -41,7 +44,7 @@ public sealed partial class MainWindow : Window
         ViewModel = new RepositoryViewModel(_gitService, _settingsStore);
 
         _jiraAccount = new JiraAccountStore(_settingsStore);
-        JiraViewModel = new JiraViewModel(_jiraAccount);
+        JiraViewModel = new JiraViewModel(_jiraAccount, _settingsStore);
         JiraViewModel.PropertyChanged += JiraViewModel_PropertyChanged;
 
         Activated += MainWindow_Activated;
@@ -63,13 +66,15 @@ public sealed partial class MainWindow : Window
     {
         await ViewModel.InitializeAsync();
 
+        JiraViewModel.LoadSavedQueries();
         JiraViewModel.NotifyAccountChanged();
 
         // Only if the board is what's on screen: opening the app on Changes
         // should not call Jira at all.
-        if (SidebarFrame.Content is KanbanSidebarPage kanban)
+        if (ContentFrame.Content is KanbanBoardPage board)
         {
-            kanban.Update();
+            (SidebarFrame.Content as KanbanSidebarPage)?.Update();
+            board.Update();
             if (JiraViewModel.IsConfigured && !JiraViewModel.HasSearched) await JiraViewModel.RefreshAsync();
         }
     }
@@ -89,14 +94,18 @@ public sealed partial class MainWindow : Window
         var suppressInfo = new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo();
 
         // Sidebar and detail pane move together: Changes pairs with the file
-        // diff, History with the commit detail.
+        // diff, History with the commit detail, Kanban's queries with its board.
         if (sender.SelectedItem == KanbanTab)
         {
             SidebarFrame.Navigate(typeof(KanbanSidebarPage), JiraViewModel, suppressInfo);
             if (SidebarFrame.Content is KanbanSidebarPage kanban) kanban.SettingsRequested += (_, _) => OpenSettings();
 
-            ContentFrame.Navigate(typeof(IssueDetailPage), new IssueDetailParameter(JiraViewModel, ViewModel), suppressInfo);
-            (ContentFrame.Content as IssueDetailPage)?.Update();
+            ContentFrame.Navigate(typeof(KanbanBoardPage), JiraViewModel, suppressInfo);
+            if (ContentFrame.Content is KanbanBoardPage board)
+            {
+                board.SettingsRequested += (_, _) => OpenSettings();
+                board.IssueOpened += (_, issue) => OpenIssue(issue);
+            }
         }
         else if (sender.SelectedItem == HistoryTab)
         {
@@ -119,18 +128,40 @@ public sealed partial class MainWindow : Window
     {
         switch (e.PropertyName)
         {
-            case nameof(ViewModels.JiraViewModel.SelectedIssue):
-                // Both panes: the sidebar has to move its highlight too.
+            case nameof(ViewModels.JiraViewModel.SelectedQuery):
+            case nameof(ViewModels.JiraViewModel.Queries):
+                // Both panes: the sidebar moves its highlight, the board its title.
                 (SidebarFrame.Content as KanbanSidebarPage)?.Update();
-                (ContentFrame.Content as IssueDetailPage)?.Update();
+                (ContentFrame.Content as KanbanBoardPage)?.Update();
                 break;
 
+            case nameof(ViewModels.JiraViewModel.Columns):
             case nameof(ViewModels.JiraViewModel.IsLoading):
             case nameof(ViewModels.JiraViewModel.ErrorMessage):
             case nameof(ViewModels.JiraViewModel.HasSearched):
+                (ContentFrame.Content as KanbanBoardPage)?.Update();
+                break;
+
+            case nameof(ViewModels.JiraViewModel.IsConfigured):
                 (SidebarFrame.Content as KanbanSidebarPage)?.Update();
+                (ContentFrame.Content as KanbanBoardPage)?.Update();
                 break;
         }
+    }
+
+    /// <summary>One window per issue, like Settings has one window: a second click brings it forward.</summary>
+    private void OpenIssue(Core.Jira.JiraIssue issue)
+    {
+        if (_issueWindows.TryGetValue(issue.Key, out var existing))
+        {
+            existing.Activate();
+            return;
+        }
+
+        var window = new IssueWindow(JiraViewModel, ViewModel, issue);
+        _issueWindows[issue.Key] = window;
+        window.Closed += (_, _) => _issueWindows.Remove(issue.Key);
+        window.Activate();
     }
 
     // MARK: - Settings
@@ -151,10 +182,12 @@ public sealed partial class MainWindow : Window
         window.AccountChanged += (_, _) =>
         {
             JiraViewModel.NotifyAccountChanged();
-            (SidebarFrame.Content as KanbanSidebarPage)?.Update();
 
-            // Newly connected and nothing on screen yet: fill the board.
-            if (JiraViewModel.IsConfigured && !JiraViewModel.HasSearched) _ = JiraViewModel.RefreshAsync();
+            // Newly connected and the board on screen with nothing on it: fill it.
+            if (ContentFrame.Content is KanbanBoardPage && JiraViewModel.IsConfigured && !JiraViewModel.HasSearched)
+            {
+                _ = JiraViewModel.RefreshAsync();
+            }
         };
 
         window.Closed += (_, _) => _settingsWindow = null;
@@ -385,8 +418,8 @@ public sealed partial class MainWindow : Window
             RepositoryButtonText.Text = name ?? "Open Repository";
             ToolTipService.SetToolTip(RepositoryButton, ViewModel.RepositoryPath ?? "No repository open");
 
-            // It names the repository a branch would be created in.
-            (ContentFrame.Content as IssueDetailPage)?.Update();
+            // Every issue window names the repository a branch would be created in.
+            foreach (var issueWindow in _issueWindows.Values) issueWindow.UpdateRepositoryState();
             return;
         }
 
@@ -394,7 +427,7 @@ public sealed partial class MainWindow : Window
         {
             case nameof(RepositoryViewModel.IsBusy):
                 // "Create Branch" is disabled while git is working.
-                (ContentFrame.Content as IssueDetailPage)?.Update();
+                foreach (var issueWindow in _issueWindows.Values) issueWindow.UpdateRepositoryState();
                 break;
 
             case nameof(RepositoryViewModel.CurrentAuthor):

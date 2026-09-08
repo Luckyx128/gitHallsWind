@@ -6,17 +6,26 @@ using System.Text.Json;
 namespace GitHalls.Core.Jira;
 
 /// <summary>
-/// The two Jira Cloud calls this app makes: who am I, and which issues match a
-/// JQL query. Nothing here caches or retries — the view model decides when to
-/// ask, and a rate limit comes back as an error the user can read.
+/// The three Jira Cloud calls this app makes: who am I, which issues match a
+/// JQL query, and everything about one issue. Nothing here caches or retries —
+/// the view model decides when to ask, and a rate limit comes back as an error
+/// the user can read.
 /// </summary>
 public sealed class JiraClient
 {
     private const string SearchPath = "/rest/api/3/search/jql";
     private const string MyselfPath = "/rest/api/3/myself";
+    private const string IssuePath = "/rest/api/3/issue/";
 
-    /// <summary>Only what the sidebar renders; asking for everything costs Jira time it doesn't need to spend.</summary>
-    private static readonly string[] RequestedFields = { "summary", "status", "issuetype", "priority", "updated" };
+    /// <summary>Only what a card renders; asking for everything costs Jira time it doesn't need to spend.</summary>
+    private static readonly string[] CardFields = { "summary", "status", "issuetype", "priority", "updated", "assignee" };
+
+    /// <summary>What the detail window shows on top of the card.</summary>
+    private static readonly string[] DetailFields =
+    {
+        "summary", "status", "issuetype", "priority", "updated", "created",
+        "assignee", "reporter", "labels", "description"
+    };
 
     /// <summary>
     /// One connection pool for the process. Credentials go on each request, not
@@ -49,7 +58,7 @@ public sealed class JiraClient
     {
         var request = Request(HttpMethod.Post, SearchPath);
         var payload = JsonSerializer.Serialize(
-            new JiraSearchRequest { Jql = jql, Fields = RequestedFields, MaxResults = limit },
+            new JiraSearchRequest { Jql = jql, Fields = CardFields, MaxResults = limit },
             JiraJsonContext.Default.JiraSearchRequest);
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
@@ -65,6 +74,16 @@ public sealed class JiraClient
         }
 
         return issues;
+    }
+
+    /// <summary>One issue with its description and people, for the detail window.</summary>
+    public async Task<JiraIssue> GetIssueAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var path = IssuePath + Uri.EscapeDataString(key) + "?fields=" + string.Join(",", DetailFields);
+        var body = await SendAsync(Request(HttpMethod.Get, path), cancellationToken);
+
+        var raw = Deserialize(body, JiraJsonContext.Default.JiraIssueDto);
+        return raw == null ? throw JiraException.Malformed() : ToIssue(raw) ?? throw JiraException.Malformed();
     }
 
     /// <summary>Where a human opens this issue.</summary>
@@ -162,6 +181,15 @@ public sealed class JiraClient
             fields?.Status?.StatusCategory?.Key ?? "indeterminate",
             fields?.IssueType?.Name ?? "Task",
             fields?.Priority?.Name,
-            JiraTimestamp.Parse(fields?.Updated));
+            JiraTimestamp.Parse(fields?.Updated))
+        {
+            AssigneeName = fields?.Assignee?.DisplayName,
+            ReporterName = fields?.Reporter?.DisplayName,
+            Created = JiraTimestamp.Parse(fields?.Created),
+            Labels = fields?.Labels ?? new List<string>(),
+            // Null (never asked) is not the same as empty (asked, and there is
+            // none): the detail window tells the two apart.
+            Description = fields?.Description == null ? null : JiraAdf.ToPlainText(fields.Description)
+        };
     }
 }
