@@ -12,7 +12,7 @@ namespace GitHalls.App;
 
 public sealed partial class MainWindow : Window
 {
-    private const double DefaultSidebarMinWidth = 220;
+    private const double DefaultSidebarMinWidth = 260;
 
     private readonly GitService _gitService = new();
     private readonly PlatformActions _platformActions = new();
@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, IssueWindow> _issueWindows = new(StringComparer.Ordinal);
 
     /// <summary>Sidebar width to restore when it is expanded again.</summary>
-    private double _restoreSidebarWidth = 280;
+    private double _restoreSidebarWidth = 340;
 
     public RepositoryViewModel ViewModel { get; }
 
