@@ -640,6 +640,28 @@ public sealed partial class DiffTextView : UserControl
         GutterLayer.Children.Add(Glyph(CheckGlyph, GutterPadding, y, _theme.SelectionMark));
     }
 
+    private void PaintHunkHeaderMark(int index, double y)
+    {
+        if (!CanSelect) return;
+
+        var hunk = _source?.HunkAt(index);
+        if (hunk == null || !hunk.HasContent) return;
+
+        var hasSelected = false;
+        var hasUnselected = false;
+
+        for (int i = hunk.FirstLineIndex; i <= hunk.LastLineIndex; i++)
+        {
+            if (!PatchBuilder.IsSelectable(_source!.Lines[i])) continue;
+            if (_selected[i]) hasSelected = true;
+            else hasUnselected = true;
+        }
+
+
+        var glyph = hasUnselected ? PartialGlyph : CheckGlyph;
+        GutterLayer.Children.Add(Glyph(glyph, GutterPadding, y, _theme.SelectionMark));
+    }
+
     private static TextBlock Glyph(string glyph, double x, double y, Color color)
     {
         var text = new TextBlock
