@@ -1,3 +1,4 @@
+using GitHalls.App.Helpers;
 using GitHalls.App.Themes;
 using GitHalls.App.ViewModels;
 using GitHalls.Core.Jira;
@@ -40,7 +41,7 @@ public sealed partial class IssueWindow : Window
         _issue = issue;
 
         InitializeComponent();
-        SetTitleBar(AppTitleBar);
+        this.ConfigureCustomTitleBar(AppTitleBar);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(640, 760));
 
         Closed += (_, _) => _lifetime.Cancel();

@@ -1,3 +1,4 @@
+using GitHalls.App.Helpers;
 using GitHalls.App.Services;
 using GitHalls.App.ViewModels;
 using GitHalls.Core.Jira;
@@ -47,7 +48,7 @@ public sealed partial class SettingsWindow : Window
         _repository = repository;
 
         InitializeComponent();
-        SetTitleBar(AppTitleBar);
+        this.ConfigureCustomTitleBar(AppTitleBar);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(620, 900));
 
         IdentityList.ItemsSource = _identities;

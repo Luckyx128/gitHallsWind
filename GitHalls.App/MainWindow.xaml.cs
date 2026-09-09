@@ -1,4 +1,5 @@
 using GitHalls.App.Controls;
+using GitHalls.App.Helpers;
 using GitHalls.App.Services;
 using GitHalls.App.ViewModels;
 using GitHalls.App.Views;
@@ -39,7 +40,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        SetTitleBar(AppTitleBar);
+        this.ConfigureCustomTitleBar(AppTitleBar);
 
         ViewModel = new RepositoryViewModel(_gitService, _settingsStore);
 

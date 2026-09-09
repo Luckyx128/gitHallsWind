@@ -11,7 +11,7 @@
   <Identity
     Name="72208162-5be0-4b68-89bf-57e492cf7280"
     Publisher="CN=Lucas"
-    Version="1.0.1.0" />
+    Version="1.0.3.0" />
 
   <mp:PhoneIdentity PhoneProductId="72208162-5be0-4b68-89bf-57e492cf7280" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
