@@ -657,6 +657,7 @@ public sealed partial class DiffTextView : UserControl
             else hasUnselected = true;
         }
 
+        if (!hasSelected) return;
 
         var glyph = hasUnselected ? PartialGlyph : CheckGlyph;
         GutterLayer.Children.Add(Glyph(glyph, GutterPadding, y, _theme.SelectionMark));
