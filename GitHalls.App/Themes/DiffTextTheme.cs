@@ -41,6 +41,18 @@ public sealed class DiffTextTheme
     public required Color DeletionMarker { get; init; }
     public required Color SearchHighlight { get; init; }
 
+    /// <summary>Tint over a row picked for staging. Sits on top of the +/- tint.</summary>
+    public required Color SelectionBackground { get; init; }
+
+    /// <summary>Tint under the cursor in the selection column.</summary>
+    public required Color HoverBackground { get; init; }
+
+    /// <summary>The check drawn in the selection column of a picked row.</summary>
+    public required Color SelectionMark { get; init; }
+
+    /// <summary>The same mark before it is picked — visible only on hover.</summary>
+    public required Color SelectionMarkIdle { get; init; }
+
     public required IReadOnlyDictionary<DiffTokenKind, Color> Tokens { get; init; }
 
     public const string FontFamily = "Cascadia Mono, Consolas, Courier New";
@@ -82,6 +94,10 @@ public sealed class DiffTextTheme
         AdditionMarker = Color.FromArgb(255, 10, 107, 10),    // GHAdditionColor #0A6B0A
         DeletionMarker = Color.FromArgb(255, 188, 40, 25),    // GHDeletionColor #BC2819
         SearchHighlight = Color.FromArgb(120, 255, 214, 0),
+        SelectionBackground = Color.FromArgb(46, 51, 115, 230),
+        HoverBackground = Color.FromArgb(20, 51, 115, 230),
+        SelectionMark = Color.FromArgb(255, 51, 115, 230),
+        SelectionMarkIdle = Color.FromArgb(255, 176, 176, 176),
         Tokens = new Dictionary<DiffTokenKind, Color>
         {
             [DiffTokenKind.Plain] = Color.FromArgb(255, 33, 33, 33),
@@ -110,6 +126,10 @@ public sealed class DiffTextTheme
         AdditionMarker = Color.FromArgb(255, 108, 203, 95),   // GHAdditionColor #6CCB5F
         DeletionMarker = Color.FromArgb(255, 255, 153, 164),  // GHDeletionColor #FF99A4
         SearchHighlight = Color.FromArgb(120, 255, 193, 7),
+        SelectionBackground = Color.FromArgb(56, 89, 140, 255),
+        HoverBackground = Color.FromArgb(26, 89, 140, 255),
+        SelectionMark = Color.FromArgb(255, 118, 163, 255),
+        SelectionMarkIdle = Color.FromArgb(255, 110, 110, 110),
         Tokens = new Dictionary<DiffTokenKind, Color>
         {
             [DiffTokenKind.Plain] = Color.FromArgb(255, 224, 224, 224),

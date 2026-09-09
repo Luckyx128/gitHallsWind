@@ -504,8 +504,15 @@ public sealed partial class MainWindow : Window
                 break;
 
             case nameof(RepositoryViewModel.CurrentDiff):
+            case nameof(RepositoryViewModel.WorkingTreeDiff):
+            case nameof(RepositoryViewModel.IndexDiff):
+            case nameof(RepositoryViewModel.DiffSideSelection):
                 // Only if that pane is the one on screen — the History tab owns
                 // the frame while it is selected.
+                //
+                // The two sides come through here as well: the toggle above the
+                // diff shows what each of them holds, so it has to be repainted
+                // when either changes and not only when the shown one does.
                 (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff, ViewModel.CurrentDiffPreview);
                 break;
 

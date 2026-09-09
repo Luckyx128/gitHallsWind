@@ -18,6 +18,7 @@ public sealed partial class DiffViewer : UserControl
     private FileDiff? _diff;
     private BinaryFileContents? _preview;
     private bool _sideBySide;
+    private bool _selectionEnabled;
 
     public DiffViewer()
     {
@@ -25,7 +26,43 @@ public sealed partial class DiffViewer : UserControl
 
         LeftView.VerticalOffsetChanged += (_, offset) => Mirror(RightView, offset);
         RightView.VerticalOffsetChanged += (_, offset) => Mirror(LeftView, offset);
+
+        UnifiedView.SelectionChanged += (_, count) => SelectionChanged?.Invoke(this, count);
+        UnifiedView.HunkActionInvoked += (_, hunk) => HunkActionInvoked?.Invoke(this, hunk);
     }
+
+    // MARK: - Staging selection
+
+    /// <summary>
+    /// Lets rows be picked for staging. Only the unified view offers it: the
+    /// split columns are padded copies, so a row there is not a row of the diff.
+    ///
+    /// Takes effect at the next <see cref="SetDiff"/>, which is what keeps a
+    /// file change down to a single render.
+    /// </summary>
+    public bool SelectionEnabled
+    {
+        get => _selectionEnabled;
+        set
+        {
+            _selectionEnabled = value;
+            UnifiedView.SelectionEnabled = value;
+        }
+    }
+
+    /// <summary>Wording of the per-hunk button — "Stage hunk" or "Unstage hunk".</summary>
+    public string HunkActionLabel
+    {
+        get => UnifiedView.HunkActionLabel;
+        set => UnifiedView.HunkActionLabel = value;
+    }
+
+    public int SelectedCount => UnifiedView.SelectedCount;
+    public HashSet<int> SelectedLineIndices => UnifiedView.SelectedLineIndices;
+    public void ClearSelection() => UnifiedView.ClearSelection();
+
+    public event EventHandler<int>? SelectionChanged;
+    public event EventHandler<DiffHunk>? HunkActionInvoked;
 
     public bool SideBySide
     {

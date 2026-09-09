@@ -1,3 +1,4 @@
+using System.Text;
 using GitHalls.Core.Commits;
 using GitHalls.Core.Git.Parsers;
 using GitHalls.Core.Models;
@@ -345,6 +346,75 @@ public class GitService
     public async Task UnstageAsync(string repoPath, string filePath, CancellationToken cancellationToken = default)
     {
         await _runner.RunAsync(repoPath, new[] { "restore", "--staged", "--", filePath }, cancellationToken: cancellationToken);
+    }
+
+    // MARK: - Partial staging
+
+    /// <summary>
+    /// Working tree against the index — what can still be staged. Its "old"
+    /// side is the index, which is what makes a patch built from it applicable
+    /// with <c>git apply --cached</c>.
+    /// </summary>
+    public async Task<FileDiff> GetWorkingTreeDiffAsync(string repoPath, FileChange change, CancellationToken cancellationToken = default)
+    {
+        // git has no diff to give for a file it doesn't track yet, and the
+        // synthesized stand-in carries no patch, so it is staged whole.
+        if (change.IndexStatus == FileChangeStatus.Untracked)
+        {
+            return await GetDiffAsync(repoPath, change, cancellationToken);
+        }
+
+        var text = await RunRawDiffAsync(
+            repoPath,
+            new[] { "diff", "--no-color", "--unified=3", "--", change.Path },
+            cancellationToken);
+
+        return _diffParser.Parse(change.Path, text, DiffSide.WorkingTree);
+    }
+
+    /// <summary>Index against HEAD — what can be unstaged.</summary>
+    public async Task<FileDiff> GetIndexDiffAsync(string repoPath, FileChange change, CancellationToken cancellationToken = default)
+    {
+        var text = await RunRawDiffAsync(
+            repoPath,
+            new[] { "diff", "--no-color", "--unified=3", "--cached", "--", change.Path },
+            cancellationToken);
+
+        return _diffParser.Parse(change.Path, text, DiffSide.Index);
+    }
+
+    /// <summary>
+    /// Reads a diff without the CRLF normalization <see cref="GitProcessRunner.RunAsync"/>
+    /// applies. That normalization would strip the CR of every line of a CRLF
+    /// file, and a patch rebuilt from the result no longer matches the index —
+    /// git rejects it with "patch does not apply".
+    /// </summary>
+    private async Task<string> RunRawDiffAsync(string repoPath, IEnumerable<string> arguments, CancellationToken cancellationToken)
+    {
+        var (output, exitCode) = await _runner.RunBytesAsync(repoPath, arguments, cancellationToken);
+
+        // "diff" reports nothing to say as an empty success; anything else is a
+        // real failure and reads better as an empty diff than as a crash.
+        if (exitCode != 0 || output.Length == 0) return string.Empty;
+
+        return new UTF8Encoding(false).GetString(output);
+    }
+
+    /// <summary>
+    /// Applies <paramref name="patch"/> to the index alone, leaving the working
+    /// tree untouched. <paramref name="reverse"/> takes the change back out.
+    /// A patch git won't accept surfaces as a <see cref="GitException"/>.
+    /// </summary>
+    public async Task ApplyPatchAsync(string repoPath, string patch, bool reverse, CancellationToken cancellationToken = default)
+    {
+        var args = new List<string> { "apply", "--cached", "--whitespace=nowarn" };
+        if (reverse) args.Add("--reverse");
+
+        // No --recount: the counts are computed, and --recount would quietly
+        // repair a builder bug instead of letting a test catch it.
+        args.Add("-");
+
+        await _runner.RunAsync(repoPath, args, stdinData: patch, cancellationToken: cancellationToken);
     }
 
     /// <summary>

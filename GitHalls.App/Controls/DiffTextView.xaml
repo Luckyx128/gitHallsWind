@@ -50,9 +50,28 @@
                                IsTabStop="True"
                                LineStackingStrategy="BlockLineHeight" />
 
-                <Canvas x:Name="GutterLayer" HorizontalAlignment="Left">
+                <!-- Background="Transparent" is what makes the gutter able to
+                     receive the pointer at all: an unpainted Canvas is not hit
+                     testable. The row children stay IsHitTestVisible="False" so
+                     every event arrives here, at one handler. -->
+                <Canvas x:Name="GutterLayer" HorizontalAlignment="Left" Background="Transparent"
+                        PointerMoved="GutterLayer_PointerMoved"
+                        PointerPressed="GutterLayer_PointerPressed"
+                        PointerReleased="GutterLayer_PointerReleased"
+                        PointerCanceled="GutterLayer_PointerExited"
+                        PointerCaptureLost="GutterLayer_PointerReleased"
+                        PointerExited="GutterLayer_PointerExited">
                     <Canvas.RenderTransform>
                         <TranslateTransform x:Name="GutterTransform" />
+                    </Canvas.RenderTransform>
+                </Canvas>
+
+                <!-- Above the gutter, and pinned the same way: the only layer
+                     holding something clickable, so nothing else has to become
+                     hit testable. -->
+                <Canvas x:Name="OverlayLayer" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Canvas.RenderTransform>
+                        <TranslateTransform x:Name="OverlayTransform" />
                     </Canvas.RenderTransform>
                 </Canvas>
             </Grid>

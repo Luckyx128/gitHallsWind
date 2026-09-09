@@ -63,6 +63,11 @@ public class GitProcessRunner : IGitProcessRunner
             StandardErrorEncoding = new UTF8Encoding(false),
         };
 
+        // Without this .NET writes stdin in the console's code page, so a patch
+        // carrying an accent reaches "git apply" corrupted. No BOM: git reads
+        // the first bytes as part of the patch.
+        if (redirectStdin) startInfo.StandardInputEncoding = new UTF8Encoding(false);
+
         startInfo.Environment["LC_ALL"] = "C";
         startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
 

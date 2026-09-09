@@ -1,5 +1,6 @@
 using GitHalls.App.Services;
 using GitHalls.App.Themes;
+using GitHalls.Core.Diff;
 using GitHalls.Core.Models;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
@@ -41,15 +42,58 @@ public sealed partial class DiffTextView : UserControl
     private const double ColumnGap = 6;
     private const double TextGap = 8;
 
+    /// <summary>Width of the staging column at the left of the gutter.</summary>
+    private const double SelectColumnWidth = 18;
+
+    private const string CheckGlyph = "\uE73E";
+    private const string PartialGlyph = "\uE739";
+
+    /// <summary>
+    /// Resolved once. A per-row resource lookup is the exact cost the theme is
+    /// duplicated in code to avoid.
+    /// </summary>
+    private static readonly FontFamily SymbolFont = new("Segoe Fluent Icons, Segoe MDL2 Assets");
+
     private readonly IDiffHighlighter _highlighter;
 
     private HighlightedDiff? _diff;
+
+    /// <summary>
+    /// The diff the highlighted one was made from. Kept because a row index is
+    /// the same in both, and staging needs the hunks and the raw lines that only
+    /// this one carries.
+    /// </summary>
+    private FileDiff? _source;
+
     private DiffTextTheme _theme = DiffTextTheme.Light;
 
     private int _renderedLineCount;
     private double _gutterWidth;
+    private double _selectColumnWidth;
     private double _numberColumnWidth;
     private double _contentWidth;
+
+    /// <summary>
+    /// One flag per line rather than a set of controls: the whole reason a
+    /// 4000-line diff can be selected through without the scroll suffering.
+    /// </summary>
+    private bool[] _selected = Array.Empty<bool>();
+    private int _selectedCount;
+
+    private int _hoverRow = -1;
+    private int _dragAnchor = -1;
+
+    /// <summary>Whether the drag in progress is selecting or clearing.</summary>
+    private bool _dragSelects;
+    private bool _dragging;
+    private int _lastDragRow = -1;
+
+    /// <summary>
+    /// The selection as it was when the drag began. Each move restores it and
+    /// reapplies the range, so dragging back over rows undoes them instead of
+    /// leaving a trail.
+    /// </summary>
+    private bool[] _selectionBeforeDrag = Array.Empty<bool>();
 
     /// <summary>Line indices currently matching the find query.</summary>
     private readonly List<int> _matches = new();
@@ -86,6 +130,69 @@ public sealed partial class DiffTextView : UserControl
     /// <summary>Scrolls to <paramref name="offset"/> without animating.</summary>
     public void SetVerticalOffset(double offset) => Scroller.ChangeView(null, offset, null, disableAnimation: true);
 
+    // MARK: - Staging selection
+
+    /// <summary>
+    /// Lets rows be picked for staging. Off by default: the commit detail pane
+    /// shows history, which nothing can be staged from.
+    ///
+    /// Read when the diff is rendered rather than acted on here, so setting it
+    /// and then handing over a diff costs one render instead of two. Set it
+    /// before <see cref="SetDiff"/>, never after.
+    /// </summary>
+    public bool SelectionEnabled { get; set; }
+
+    /// <summary>How many changed lines are picked.</summary>
+    public int SelectedCount => _selectedCount;
+
+    /// <summary>The picked rows, as indices into the diff's lines.</summary>
+    public HashSet<int> SelectedLineIndices
+    {
+        get
+        {
+            var set = new HashSet<int>();
+            for (int i = 0; i < _selected.Length; i++)
+            {
+                if (_selected[i]) set.Add(i);
+            }
+
+            return set;
+        }
+    }
+
+    /// <summary>Raised whenever the picked rows change, with the new count.</summary>
+    public event EventHandler<int>? SelectionChanged;
+
+    /// <summary>Raised by the button on a hunk header — stage or unstage that block outright.</summary>
+    public event EventHandler<DiffHunk>? HunkActionInvoked;
+
+    /// <summary>Text for that button. The pane sets it to "Stage" or "Unstage".</summary>
+    public string HunkActionLabel { get; set; } = "Stage hunk";
+
+    public void ClearSelection()
+    {
+        if (_selectedCount == 0) return;
+
+        ClearSelectionState();
+        RepaintLayers(force: true);
+        SelectionChanged?.Invoke(this, 0);
+    }
+
+    private void ClearSelectionState()
+    {
+        Array.Clear(_selected);
+
+        // Same length as the live selection, always: a drag restores from it by
+        // a straight copy.
+        _selectionBeforeDrag = new bool[_selected.Length];
+
+        _selectedCount = 0;
+        _hoverRow = -1;
+        _dragAnchor = -1;
+        _dragging = false;
+        _lastDragRow = -1;
+    }
+
     public DiffTextView() : this(ColorCodeDiffHighlighter.Instance) { }
 
     public DiffTextView(IDiffHighlighter highlighter)
@@ -119,20 +226,28 @@ public sealed partial class DiffTextView : UserControl
     {
         CloseFind();
 
+        _selected = diff == null ? Array.Empty<bool>() : new bool[diff.Lines.Count];
+        ClearSelectionState();
+
         if (diff == null || diff.Lines.Count == 0)
         {
             _diff = null;
+            _source = null;
             TextLayer.Blocks.Clear();
             TintLayer.Children.Clear();
             GutterLayer.Children.Clear();
+            OverlayLayer.Children.Clear();
             ShowRemainingButton.Visibility = Visibility.Collapsed;
             _renderedLineCount = 0;
             ApplyIntrinsicHeight();
+            SelectionChanged?.Invoke(this, 0);
             return;
         }
 
+        _source = diff;
         _diff = DiffHighlightMapper.Make(diff, _highlighter);
         Render(Math.Min(_diff.Lines.Count, MaxRenderedLines));
+        SelectionChanged?.Invoke(this, 0);
     }
 
     private void Render(int lineCount)
@@ -141,6 +256,13 @@ public sealed partial class DiffTextView : UserControl
 
         _renderedLineCount = lineCount;
         MeasureGutter();
+
+        // The gutter is painted (Background="Transparent") so it can receive the
+        // pointer, which also means it swallows one. Off where nothing can be
+        // picked, so dragging a text selection from the margin still works in
+        // the commit pane.
+        GutterLayer.IsHitTestVisible = CanSelect;
+
         BuildText();
         UpdateContentSize();
         RepaintLayers(force: true);
@@ -235,10 +357,19 @@ public sealed partial class DiffTextView : UserControl
         var digitWidth = DiffTextTheme.GutterFontSize * 0.62;
         _numberColumnWidth = digits * digitWidth + 4;
 
+        _selectColumnWidth = CanSelect ? SelectColumnWidth : 0;
+
         var numberColumns = SingleNumberColumn ? 1 : 2;
         _gutterWidth = Math.Ceiling(
-            GutterPadding + MarkerWidth + numberColumns * (ColumnGap + _numberColumnWidth) + GutterPadding);
+            GutterPadding + _selectColumnWidth + MarkerWidth
+            + numberColumns * (ColumnGap + _numberColumnWidth) + GutterPadding);
     }
+
+    /// <summary>
+    /// Whether this diff can be staged from at all. A binary file, a notice or
+    /// an untracked file's synthesized diff carries no patch to build.
+    /// </summary>
+    private bool CanSelect => SelectionEnabled && _source is { CanBuildPatch: true };
 
     private void UpdateContentSize()
     {
@@ -260,6 +391,11 @@ public sealed partial class DiffTextView : UserControl
         TintLayer.Height = height;
         GutterLayer.Width = _gutterWidth;
         GutterLayer.Height = height;
+
+        // Zero-sized on purpose: a Canvas does not clip, so the one button it
+        // may hold still draws, and nothing else in it can swallow a click.
+        OverlayLayer.Width = 0;
+        OverlayLayer.Height = 0;
     }
 
     // MARK: - Tint + gutter painting
@@ -269,6 +405,7 @@ public sealed partial class DiffTextView : UserControl
         // The gutter lives inside the scrolled content, so it is pushed back by
         // exactly the horizontal offset to stay pinned at the left edge.
         GutterTransform.X = Scroller.HorizontalOffset;
+        OverlayTransform.X = Scroller.HorizontalOffset;
         RepaintLayers(force: false);
         VerticalOffsetChanged?.Invoke(this, Scroller.VerticalOffset);
     }
@@ -325,36 +462,132 @@ public sealed partial class DiffTextView : UserControl
             var y = i * DiffTextTheme.LineHeight;
 
             PaintTint(line, i, y);
-            PaintGutterRow(line, y);
+            PaintGutterRow(line, i, y);
         }
+
+        PaintHover();
+    }
+
+    /// <summary>
+    /// Everything that answers the pointer, on a layer of its own: at most a
+    /// tint, a glyph and a button. Following the pointer would otherwise mean
+    /// rebuilding every visible row for a change to one of them, which is what
+    /// a hover down a long diff would have cost.
+    /// </summary>
+    private void PaintHover()
+    {
+        OverlayLayer.Children.Clear();
+
+        if (!CanSelect || _hoverRow < 0 || _hoverRow >= _renderedLineCount) return;
+
+        var line = _source!.Lines[_hoverRow];
+        var y = _hoverRow * DiffTextTheme.LineHeight;
+        var isHeader = line.Type == DiffLineType.HunkHeader;
+
+        if (!isHeader && !PatchBuilder.IsSelectable(line)) return;
+
+        var hunk = isHeader ? _source.HunkAt(_hoverRow) : null;
+        if (isHeader && hunk is not { HasContent: true }) return;
+
+        // Hit testing stays off for all of it except the button: the text
+        // underneath has to keep its own selection.
+        var tint = new Rectangle
+        {
+            Width = Math.Max(_contentWidth, 0),
+            Height = DiffTextTheme.LineHeight,
+            Fill = new SolidColorBrush(_theme.HoverBackground),
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(tint, 0);
+        Canvas.SetTop(tint, y);
+        OverlayLayer.Children.Add(tint);
+
+        if (isHeader)
+        {
+            var whole = IsWholeHunkSelected(hunk!);
+            OverlayLayer.Children.Add(Glyph(whole ? CheckGlyph : PartialGlyph, GutterPadding, y,
+                whole ? _theme.SelectionMark : _theme.SelectionMarkIdle));
+            AddHunkButton(hunk!, y);
+            return;
+        }
+
+        // Nothing is drawn under the pointer on a row already picked — its own
+        // check is there already, in the gutter.
+        if (_hoverRow >= _selected.Length || !_selected[_hoverRow])
+        {
+            OverlayLayer.Children.Add(Glyph(CheckGlyph, GutterPadding, y, _theme.SelectionMarkIdle));
+        }
+    }
+
+    /// <summary>The one interactive element in the whole control.</summary>
+    private void AddHunkButton(DiffHunk hunk, double y)
+    {
+        var button = new Button
+        {
+            Content = HunkActionLabel,
+            FontSize = 11,
+            Padding = new Thickness(8, 0, 8, 0),
+            MinHeight = 0,
+            Height = DiffTextTheme.LineHeight - 2,
+            CornerRadius = new CornerRadius(3),
+            Tag = hunk
+        };
+        button.Click += HunkButton_Click;
+
+        Canvas.SetLeft(button, _gutterWidth + TextGap);
+        Canvas.SetTop(button, y + 1);
+        OverlayLayer.Children.Add(button);
+    }
+
+    private void HunkButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: DiffHunk hunk }) HunkActionInvoked?.Invoke(this, hunk);
     }
 
     private void PaintTint(HighlightedDiffLine line, int index, double y)
     {
         var isMatch = _currentMatch >= 0 && _currentMatch < _matches.Count && _matches[_currentMatch] == index;
         var color = isMatch ? _theme.SearchHighlight : _theme.LineBackground(line.Type);
-        if (color == null) return;
 
         // A hunk header reads as a full-width band; +/- tints start after the
         // gutter so the numbers keep their own backdrop.
         var left = line.Type == DiffLineType.HunkHeader ? 0 : _gutterWidth;
 
+        if (color != null) AddTint(color.Value, left, y);
+
+        // Selection sits over the +/- tint rather than replacing it: which side
+        // a picked line is on still has to be readable.
+        if (CanSelect && index < _selected.Length && _selected[index])
+        {
+            AddTint(_theme.SelectionBackground, left, y);
+        }
+    }
+
+    private void AddTint(Color color, double left, double y)
+    {
         var rectangle = new Rectangle
         {
             Width = Math.Max(_contentWidth - left, 0),
             Height = DiffTextTheme.LineHeight,
-            Fill = new SolidColorBrush(color.Value)
+            Fill = new SolidColorBrush(color),
+            IsHitTestVisible = false
         };
         Canvas.SetLeft(rectangle, left);
         Canvas.SetTop(rectangle, y);
         TintLayer.Children.Add(rectangle);
     }
 
-    private void PaintGutterRow(HighlightedDiffLine line, double y)
+    private void PaintGutterRow(HighlightedDiffLine line, int index, double y)
     {
-        if (line.Type == DiffLineType.HunkHeader) return;
+        if (line.Type == DiffLineType.HunkHeader)
+        {
+            PaintHunkHeaderMark(index, y);
+            return;
+        }
 
-        var markerX = GutterPadding;
+        PaintSelectionMark(index, y);
+
+        var markerX = GutterPadding + _selectColumnWidth;
         var oldColumnX = markerX + MarkerWidth + ColumnGap;
 
         if (SingleNumberColumn)
@@ -394,6 +627,37 @@ public sealed partial class DiffTextView : UserControl
         GutterLayer.Children.Add(marker);
     }
 
+    /// <summary>
+    /// The check in the staging column of a picked row. The faint one under the
+    /// pointer belongs to <see cref="PaintHover"/>, so following the pointer
+    /// never touches this layer.
+    /// </summary>
+    private void PaintSelectionMark(int index, double y)
+    {
+        if (!CanSelect) return;
+        if (index >= _selected.Length || !_selected[index]) return;
+
+        GutterLayer.Children.Add(Glyph(CheckGlyph, GutterPadding, y, _theme.SelectionMark));
+    }
+
+    private static TextBlock Glyph(string glyph, double x, double y, Color color)
+    {
+        var text = new TextBlock
+        {
+            Text = glyph,
+            FontFamily = SymbolFont,
+            FontSize = 11,
+            Foreground = new SolidColorBrush(color),
+            Width = SelectColumnWidth,
+            Height = DiffTextTheme.LineHeight,
+            TextAlignment = TextAlignment.Center,
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(text, x);
+        Canvas.SetTop(text, y);
+        return text;
+    }
+
     private void AddNumber(int? number, double x, double y)
     {
         if (number == null) return;
@@ -412,6 +676,162 @@ public sealed partial class DiffTextView : UserControl
         Canvas.SetLeft(text, x);
         Canvas.SetTop(text, y);
         GutterLayer.Children.Add(text);
+    }
+
+    // MARK: - Pointer
+
+    /// <summary>
+    /// The row under the pointer. The gutter spans the whole content, so its own
+    /// coordinates are already content space — no scroll offset to add and no
+    /// text layout to ask, which is what makes this cheap enough to run on every
+    /// move.
+    /// </summary>
+    private int RowAt(PointerRoutedEventArgs e)
+    {
+        var y = e.GetCurrentPoint(GutterLayer).Position.Y;
+        if (y < 0) return -1;
+
+        var row = (int)(y / DiffTextTheme.LineHeight);
+        return row < _renderedLineCount ? row : -1;
+    }
+
+    private void GutterLayer_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!CanSelect) return;
+
+        var row = RowAt(e);
+
+        if (_dragging)
+        {
+            // The throttle that keeps a drag from thrashing: within one row,
+            // there is nothing new to paint.
+            if (row < 0 || row == _lastDragRow) return;
+
+            _lastDragRow = row;
+            ApplyDragRange(row);
+            return;
+        }
+
+        if (row == _hoverRow) return;
+
+        _hoverRow = row;
+        PaintHover();
+    }
+
+    private void GutterLayer_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (!CanSelect) return;
+
+        var row = RowAt(e);
+        if (row < 0) return;
+
+        e.Handled = true;
+
+        var line = _source!.Lines[row];
+        if (line.Type == DiffLineType.HunkHeader)
+        {
+            var hunk = _source.HunkAt(row);
+            if (hunk is { HasContent: true }) ToggleHunk(hunk);
+            return;
+        }
+
+        if (!PatchBuilder.IsSelectable(line)) return;
+
+        // Shift keeps the previous anchor, so a click and a shift-click bracket
+        // a range the way a list does.
+        var extending = e.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift) && _dragAnchor >= 0;
+        if (!extending)
+        {
+            _dragAnchor = row;
+            _dragSelects = !_selected[row];
+            _selectionBeforeDrag = (bool[])_selected.Clone();
+        }
+
+        _dragging = true;
+        _lastDragRow = row;
+        ApplyDragRange(row);
+
+        GutterLayer.CapturePointer(e.Pointer);
+    }
+
+    private void GutterLayer_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_dragging) return;
+
+        _dragging = false;
+        GutterLayer.ReleasePointerCapture(e.Pointer);
+    }
+
+    private void GutterLayer_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (_dragging || _hoverRow < 0) return;
+
+        _hoverRow = -1;
+        PaintHover();
+    }
+
+    /// <summary>
+    /// Rewrites the selection as "what it was when the drag started, plus this
+    /// range". Restoring first is what lets a drag be taken back by dragging
+    /// the other way.
+    /// </summary>
+    private void ApplyDragRange(int row)
+    {
+        Array.Copy(_selectionBeforeDrag, _selected, _selected.Length);
+
+        var from = Math.Min(_dragAnchor, row);
+        var to = Math.Max(_dragAnchor, row);
+
+        for (int i = from; i <= to; i++)
+        {
+            if (PatchBuilder.IsSelectable(_source!.Lines[i])) _selected[i] = _dragSelects;
+        }
+
+        PublishSelection();
+    }
+
+    private void ToggleHunk(DiffHunk hunk)
+    {
+        var select = !IsWholeHunkSelected(hunk);
+
+        for (int i = hunk.FirstLineIndex; i <= hunk.LastLineIndex; i++)
+        {
+            if (PatchBuilder.IsSelectable(_source!.Lines[i])) _selected[i] = select;
+        }
+
+        // A hunk click is also an anchor: shift-clicking a line after it extends
+        // from the block rather than from wherever the pointer last was.
+        _dragAnchor = hunk.FirstLineIndex;
+        _selectionBeforeDrag = (bool[])_selected.Clone();
+
+        PublishSelection();
+    }
+
+    private bool IsWholeHunkSelected(DiffHunk hunk)
+    {
+        var sawOne = false;
+
+        for (int i = hunk.FirstLineIndex; i <= hunk.LastLineIndex; i++)
+        {
+            if (!PatchBuilder.IsSelectable(_source!.Lines[i])) continue;
+            if (!_selected[i]) return false;
+            sawOne = true;
+        }
+
+        return sawOne;
+    }
+
+    private void PublishSelection()
+    {
+        var count = 0;
+        foreach (var picked in _selected)
+        {
+            if (picked) count++;
+        }
+
+        _selectedCount = count;
+        RepaintLayers(force: true);
+        SelectionChanged?.Invoke(this, count);
     }
 
     // MARK: - Theme

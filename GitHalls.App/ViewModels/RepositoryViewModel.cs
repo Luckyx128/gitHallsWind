@@ -66,8 +66,32 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private FileChange? _selectedChange;
 
+    /// <summary>
+    /// The diff of the side currently being looked at. Kept as its own property
+    /// rather than computed at the call site because the window's PropertyChanged
+    /// switch is what drives the pane.
+    /// </summary>
     [ObservableProperty]
     private FileDiff? _currentDiff;
+
+    /// <summary>
+    /// Working tree against the index — what is still to be staged. Its old side
+    /// is the index, which is what lets a selection out of it be applied there.
+    /// </summary>
+    [ObservableProperty]
+    private FileDiff? _workingTreeDiff;
+
+    /// <summary>Index against HEAD — what is staged, and so what can be taken back.</summary>
+    [ObservableProperty]
+    private FileDiff? _indexDiff;
+
+    /// <summary>
+    /// Which of the two the pane is showing. The old single diff against HEAD
+    /// could show everything at once but could not be applied to the index, so
+    /// staging a selection means choosing a side first.
+    /// </summary>
+    [ObservableProperty]
+    private DiffSide _diffSideSelection = DiffSide.WorkingTree;
 
     [ObservableProperty]
     private bool _isLoadingDiff;
@@ -340,6 +364,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         }
         else
         {
+            WorkingTreeDiff = null;
+            IndexDiff = null;
             CurrentDiff = null;
         }
     }
@@ -763,15 +789,23 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         try
         {
-            var diff = await _gitService.GetDiffAsync(repoPath, change);
+            // Both sides under the one token: a slow answer for a file the user
+            // has already moved on from must not land on either of them.
+            var working = await _gitService.GetWorkingTreeDiffAsync(repoPath, change);
+            var index = await _gitService.GetIndexDiffAsync(repoPath, change);
 
-            // The user selected another file while this one was loading.
             if (_diffRequestToken != token) return;
-            CurrentDiff = diff;
+
+            WorkingTreeDiff = working;
+            IndexDiff = index;
+            DiffSideSelection = PreferredSide(working, index);
+            ApplyDiffSide();
+
+            var diff = CurrentDiff;
 
             // A binary file has no text to show, so the pane shows the file.
             // Loaded only for that file, not for every change in the list.
-            CurrentDiffPreview = diff.IsBinary
+            CurrentDiffPreview = diff is { IsBinary: true }
                 ? await LoadPreviewAsync(repoPath, diff.FilePath, "HEAD", afterRevision: null)
                 : null;
 
@@ -780,6 +814,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             if (_diffRequestToken != token) return;
+            WorkingTreeDiff = null;
+            IndexDiff = null;
             CurrentDiff = null;
             CurrentDiffPreview = null;
             ErrorMessage = $"Failed to load diff: {ex.Message}";
@@ -788,6 +824,84 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         {
             if (_diffRequestToken == token) IsLoadingDiff = false;
         }
+    }
+
+    // MARK: - Staging a selection
+
+    /// <summary>
+    /// Which side to open on. Unstaged is where the work is, so it wins whenever
+    /// it has anything; a fully staged file opens on what it has instead of on
+    /// an empty pane.
+    /// </summary>
+    private static DiffSide PreferredSide(FileDiff? working, FileDiff? index)
+    {
+        if (HasChanges(working)) return DiffSide.WorkingTree;
+        if (HasChanges(index)) return DiffSide.Index;
+        return DiffSide.WorkingTree;
+    }
+
+    private static bool HasChanges(FileDiff? diff) =>
+        diff != null && (diff.IsBinary || diff.Additions > 0 || diff.Deletions > 0);
+
+    partial void OnDiffSideSelectionChanged(DiffSide value) => ApplyDiffSide();
+
+    private void ApplyDiffSide() =>
+        CurrentDiff = DiffSideSelection == DiffSide.Index ? IndexDiff : WorkingTreeDiff;
+
+    /// <summary>
+    /// Moves just <paramref name="lineIndices"/> into or out of the index,
+    /// depending on which side is being shown. Runs through the same wrapper as
+    /// every other git action, so busy state, errors and the refresh behave the
+    /// same way.
+    /// </summary>
+    public async Task ApplySelectionAsync(IReadOnlySet<int> lineIndices)
+    {
+        var diff = CurrentDiff;
+        if (diff == null || lineIndices.Count == 0) return;
+
+        var reverse = DiffSideSelection == DiffSide.Index;
+        var patch = PatchBuilder.Build(diff, lineIndices, reverse ? PatchDirection.Reverse : PatchDirection.Forward);
+        if (patch == null) return;
+
+        var path = diff.FilePath;
+
+        await RunGitAsync(async repoPath =>
+        {
+            await _gitService.ApplyPatchAsync(repoPath, patch, reverse);
+        });
+
+        await ReloadDiffForAsync(path);
+    }
+
+    /// <summary>The same, for every changed line of one hunk.</summary>
+    public Task ApplyHunkAsync(DiffHunk hunk)
+    {
+        var diff = CurrentDiff;
+        return diff == null ? Task.CompletedTask : ApplySelectionAsync(PatchBuilder.ChangedLinesOf(diff, hunk));
+    }
+
+    /// <summary>
+    /// Reloads both sides after a patch landed, and moves off a side the patch
+    /// just emptied so the pane never sits blank on a file that still has changes.
+    /// </summary>
+    private async Task ReloadDiffForAsync(string path)
+    {
+        var change = Changes.FirstOrDefault(c => c.Path == path);
+        if (change == null)
+        {
+            WorkingTreeDiff = null;
+            IndexDiff = null;
+            CurrentDiff = null;
+            return;
+        }
+
+        var side = DiffSideSelection;
+        await LoadDiffAsync(change);
+
+        // LoadDiffAsync picks the side a fresh selection would open on; keep the
+        // one being worked in unless it has nothing left to show.
+        var stillThere = side == DiffSide.Index ? HasChanges(IndexDiff) : HasChanges(WorkingTreeDiff);
+        if (stillThere && DiffSideSelection != side) DiffSideSelection = side;
     }
 
     // MARK: - Identity

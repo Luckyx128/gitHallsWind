@@ -13,17 +13,55 @@
 
         <!-- Page title over the content, the way a Settings page names itself:
              no panel behind it and no rule under it. -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Padding="14,10,14,8">
-            <TextBlock x:Name="FilePathText" Style="{StaticResource GHPaneTitleTextStyle}" VerticalAlignment="Center" />
-            <StackPanel x:Name="StatsPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed">
-                <TextBlock x:Name="AdditionsText" Foreground="{ThemeResource GHAdditionBrush}" FontWeight="SemiBold" FontSize="13" />
-                <TextBlock x:Name="DeletionsText" Foreground="{ThemeResource GHDeletionBrush}" FontWeight="SemiBold" FontSize="13" />
+        <Grid Grid.Row="0" Padding="14,10,14,8" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Name="FilePathText" Style="{StaticResource GHPaneTitleTextStyle}" VerticalAlignment="Center" />
+                <StackPanel x:Name="StatsPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed">
+                    <TextBlock x:Name="AdditionsText" Foreground="{ThemeResource GHAdditionBrush}" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock x:Name="DeletionsText" Foreground="{ThemeResource GHDeletionBrush}" FontWeight="SemiBold" FontSize="13" />
+                </StackPanel>
             </StackPanel>
-        </StackPanel>
+
+            <!-- Which side of the file is on screen. The two are separate diffs
+                 because only the one against the index can be staged from. -->
+            <StackPanel x:Name="SidePanel" Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                <!-- An untracked file has no patch behind it, so its lines
+                     cannot be picked apart. Said once, next to the toggle,
+                     rather than as a bar over the code. -->
+                <TextBlock x:Name="WholeFileHint" VerticalAlignment="Center" FontSize="12" Visibility="Collapsed"
+                           Text="Stage the file to pick lines"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <ToggleButton x:Name="UnstagedToggle" MinWidth="0" Padding="10,3" CornerRadius="4"
+                              FontSize="12" Click="SideToggle_Click" Tag="WorkingTree" />
+                <ToggleButton x:Name="StagedToggle" MinWidth="0" Padding="10,3" CornerRadius="4"
+                              FontSize="12" Click="SideToggle_Click" Tag="Index" />
+            </StackPanel>
+        </Grid>
 
         <!-- The diff itself is the card floating on the window's Mica. -->
         <Border x:Name="DiffCard" Grid.Row="1" Style="{StaticResource GHContentCardStyle}" Margin="12,0,12,12">
             <controls:DiffViewer x:Name="DiffView" />
+        </Border>
+
+        <!-- Floats over the diff rather than taking a row of its own: it is only
+             there while something is picked, and a row appearing and vanishing
+             would shift the code under the pointer mid-drag. -->
+        <Border x:Name="SelectionBar" Grid.Row="1" Style="{StaticResource GHCardStyle}"
+                Visibility="Collapsed" Padding="10,6"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock x:Name="SelectionCountText" VerticalAlignment="Center" FontSize="12"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button x:Name="ApplySelectionButton" Style="{StaticResource AccentButtonStyle}"
+                        FontSize="12" Padding="12,4" MinHeight="0" Click="ApplySelection_Click" />
+                <Button Content="Clear" FontSize="12" Padding="10,4" MinHeight="0" Click="ClearSelection_Click" />
+            </StackPanel>
         </Border>
 
         <!-- Nothing selected is the moment the repository is opened and the
