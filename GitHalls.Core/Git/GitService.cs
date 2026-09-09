@@ -137,8 +137,15 @@ public class GitService
     {
         var args = new[] { "log", $"-n {maxCount}", $"--pretty=format:{LogFormat}" };
 
-        var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
-        return _logParser.Parse(result.StandardOutput);
+        try
+        {
+            var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+            return _logParser.Parse(result.StandardOutput);
+        }
+        catch (GitException)
+        {
+            return Array.Empty<Commit>();
+        }
     }
 
     /// <summary>
@@ -201,7 +208,7 @@ public class GitService
     {
         var result = await _runner.RunAsync(
             repoPath,
-            new[] { "show", "--pretty=format:", "--raw", "--numstat", "-z", hash },
+            new[] { "show", "--pretty=format:", "-m", "--first-parent", "--raw", "--numstat", "-z", hash },
             cancellationToken: cancellationToken);
 
         return _commitFileParser.Parse(result.StandardOutput);
@@ -212,7 +219,7 @@ public class GitService
     {
         var result = await _runner.RunAsync(
             repoPath,
-            new[] { "show", "--no-color", "--pretty=format:", hash, "--", filePath },
+            new[] { "show", "--no-color", "--pretty=format:", "-m", "--first-parent", hash, "--", filePath },
             cancellationToken: cancellationToken);
 
         return _diffParser.Parse(filePath, result.StandardOutput);

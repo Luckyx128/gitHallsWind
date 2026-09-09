@@ -120,8 +120,11 @@
                                  same way, so they line up and open the same. -->
                             <DropDownButton x:Name="RepositoryButton" Height="32" MinWidth="150" MaxWidth="260"
                                             HorizontalContentAlignment="Left">
-                                <TextBlock x:Name="RepositoryButtonText" Text="Open Repository"
-                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE82D;" Foreground="{ThemeResource GHNeutralBrush}" />
+                                    <TextBlock x:Name="RepositoryButtonText" Text="Open Repository"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                </StackPanel>
                                 <DropDownButton.Flyout>
                                     <MenuFlyout x:Name="RepositoryFlyout" Opening="RepositoryFlyout_Opening" Placement="Bottom">
                                         <MenuFlyoutItem Text="Open Repository..." Click="OpenRepo_Click" />
@@ -133,8 +136,11 @@
 
                             <DropDownButton x:Name="BranchButton" Height="32" MinWidth="150" MaxWidth="260"
                                             HorizontalContentAlignment="Left">
-                                <TextBlock x:Name="BranchButtonText" Text="Branch"
-                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xED25;" Foreground="{ThemeResource GHChangesBrush}" />
+                                    <TextBlock x:Name="BranchButtonText" Text="Branch"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                </StackPanel>
                                 <DropDownButton.Flyout>
                                     <Flyout x:Name="BranchFlyout" Placement="Bottom" Opening="BranchFlyout_Opening"
                                             ShouldConstrainToRootBounds="False">
@@ -155,7 +161,7 @@
                             <DropDownButton x:Name="IdentityButton" Height="32" MaxWidth="180"
                                             HorizontalContentAlignment="Left">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE77B;" />
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE77B;" Foreground="{ThemeResource GHKanbanBrush}" />
                                     <TextBlock x:Name="IdentityButtonText" Text="Identity"
                                                TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 </StackPanel>
@@ -188,10 +194,6 @@
                                 </StackPanel>
                             </Button>
 
-                            <Button Content="&#xE895;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
-                                    Width="36" Height="32" Padding="0"
-                                    Command="{x:Bind ViewModel.FetchCommand}"
-                                    ToolTipService.ToolTip="Fetch from remote" />
 
                             <ProgressRing Width="18" Height="18"
                                           IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
@@ -199,14 +201,28 @@
                         </StackPanel>
                     </CommandBar.Content>
 
-                    <AppBarToggleButton x:Name="SideBySideToggle" Icon="TwoPage" LabelPosition="Collapsed"
+                    <AppBarToggleButton x:Name="SideBySideToggle" Label="Side-by-side"
                                         ToolTipService.ToolTip="Side-by-side diff"
-                                        Click="SideBySideToggle_Click" />
-                    <!-- No refresh button: the repository is watched and polled,
-                         and the fetch button covers the one thing a refresh
-                         cannot learn on its own. -->
-                    <AppBarButton Icon="Send" LabelPosition="Collapsed" ToolTipService.ToolTip="Open pull request (Ctrl+R)" Click="CreatePullRequest_Click" />
-                    <AppBarButton Icon="Shuffle" LabelPosition="Collapsed" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click" />
+                                        Click="SideBySideToggle_Click">
+                        <AppBarToggleButton.Icon>
+                            <FontIcon Glyph="&#xE8A3;" Foreground="{ThemeResource GHChangesBrush}" />
+                        </AppBarToggleButton.Icon>
+                    </AppBarToggleButton>
+                    <AppBarButton Label="Fetch" Command="{x:Bind ViewModel.FetchCommand}" ToolTipService.ToolTip="Fetch from remote">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xE72C;" Foreground="{ThemeResource GHModifiedBrush}" />
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="Pull Request" ToolTipService.ToolTip="Open pull request (Ctrl+R)" Click="CreatePullRequest_Click">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xE724;" Foreground="{ThemeResource GHAdditionBrush}" />
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="Merge" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xE8B1;" Foreground="{ThemeResource GHRenamedBrush}" />
+                        </AppBarButton.Icon>
+                    </AppBarButton>
                     <AppBarButton Icon="More" LabelPosition="Collapsed" ToolTipService.ToolTip="Repository actions">
                         <AppBarButton.Flyout>
                             <MenuFlyout>

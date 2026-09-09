@@ -299,6 +299,12 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         CurrentAuthor = null;
         HasLocalIdentityOverride = false;
         ErrorMessage = null;
+        
+        Changes.Clear();
+        Commits.Clear();
+        Branches.Clear();
+        Readme = Array.Empty<MarkdownBlock>();
+        ReadmeFileName = null;
 
         if (string.IsNullOrEmpty(value)) return;
 

@@ -524,6 +524,7 @@ public sealed partial class MainWindow : Window
                 // Repainted through the same call as the diff: the README only
                 // shows where the diff is absent, and one path decides both.
                 (ContentFrame.Content as DiffPage)?.UpdateDiff(ViewModel.CurrentDiff, ViewModel.CurrentDiffPreview);
+                (ContentFrame.Content as CommitDetailPage)?.Update();
                 break;
 
             case nameof(RepositoryViewModel.PullBlockedByLocalChanges):

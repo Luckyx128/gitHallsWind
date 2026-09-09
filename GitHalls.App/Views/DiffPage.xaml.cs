@@ -25,6 +25,7 @@ public sealed partial class DiffPage : Page
     {
         var readme = _viewModel?.Readme;
         var hasReadme = readme is { Count: > 0 };
+        var hasRepo = !string.IsNullOrEmpty(_viewModel?.RepositoryPath);
 
         if (!ReferenceEquals(_shownReadme, readme))
         {
@@ -35,6 +36,7 @@ public sealed partial class DiffPage : Page
 
         ReadmeCard.Visibility = hasReadme ? Visibility.Visible : Visibility.Collapsed;
         EmptyText.Visibility = hasReadme ? Visibility.Collapsed : Visibility.Visible;
+        EmptyText.Text = hasRepo ? "Select a file to see its changes." : "Open a repository to get started.";
     }
 
     /// <summary>Set by the window alongside the diff, since the page has no view model of its own.</summary>

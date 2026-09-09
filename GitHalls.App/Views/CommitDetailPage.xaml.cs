@@ -54,11 +54,12 @@ public sealed partial class CommitDetailPage : Page
         if (ViewModel == null) return;
 
         var commit = ViewModel.SelectedCommit;
+        var hasRepo = !string.IsNullOrEmpty(ViewModel.RepositoryPath);
         if (commit == null)
         {
             DetailRoot.Visibility = Visibility.Collapsed;
             PlaceholderPanel.Visibility = Visibility.Visible;
-            PlaceholderText.Text = "Select a commit";
+            PlaceholderText.Text = hasRepo ? "Select a commit" : "Open a repository to get started.";
             return;
         }
 
