@@ -78,8 +78,7 @@
                     Visibility="Collapsed">
             <Border x:Name="StateTile" Style="{StaticResource GHEmptyStateTileStyle}"
                     Background="{ThemeResource GHKanbanTintBrush}">
-                <FontIcon x:Name="StateGlyph" Glyph="&#xE71B;" FontSize="22"
-                          Foreground="{ThemeResource GHKanbanBrush}" />
+                <FontIcon x:Name="StateGlyph" Glyph="&#xE71B;" FontSize="22" />
             </Border>
             <TextBlock x:Name="StateText" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        MaxWidth="420"

@@ -16,6 +16,7 @@ public class GitService
     private readonly CommitLogParser _logParser;
     private readonly BranchParser _branchParser;
     private readonly CommitFileParser _commitFileParser;
+    private readonly GraphLogParser _graphLogParser;
 
     public GitService(IGitProcessRunner? runner = null)
     {
@@ -25,6 +26,7 @@ public class GitService
         _logParser = new CommitLogParser();
         _branchParser = new BranchParser();
         _commitFileParser = new CommitFileParser();
+        _graphLogParser = new GraphLogParser();
     }
 
     public async Task<IReadOnlyList<FileChange>> GetStatusAsync(string repoPath, CancellationToken cancellationToken = default)
@@ -142,6 +144,23 @@ public class GitService
         {
             var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
             return _logParser.Parse(result.StandardOutput);
+        }
+        catch (GitException)
+        {
+            return Array.Empty<Commit>();
+        }
+    }
+
+    private const string GraphLogFormat = "%H%n%P%n%D%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
+
+    public async Task<IReadOnlyList<Commit>> GetGraphCommitsAsync(string repoPath, int maxCount = 200, string since = "3.months.ago", CancellationToken cancellationToken = default)
+    {
+        var args = new[] { "log", "--all", "--date-order", $"-n {maxCount}", $"--since={since}", $"--pretty=format:{GraphLogFormat}" };
+
+        try
+        {
+            var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+            return _graphLogParser.Parse(result.StandardOutput);
         }
         catch (GitException)
         {
@@ -495,6 +514,19 @@ public class GitService
     public async Task CreateBranchAsync(string repoPath, string branchName, CancellationToken cancellationToken = default)
     {
         await _runner.RunAsync(repoPath, new[] { "checkout", "-b", branchName }, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>Creates a branch at a specific commit or ref without checking it out.</summary>
+    public async Task CreateBranchAtAsync(string repoPath, string branchName, string startPoint, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "branch", branchName, startPoint }, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>Deletes a local branch.</summary>
+    public async Task DeleteBranchAsync(string repoPath, string branchName, bool force = false, CancellationToken cancellationToken = default)
+    {
+        var flag = force ? "-D" : "-d";
+        await _runner.RunAsync(repoPath, new[] { "branch", flag, branchName }, cancellationToken: cancellationToken);
     }
 
     /// <summary>

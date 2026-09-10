@@ -55,7 +55,7 @@
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <!-- min/max mirror the Swift navigationSplitViewColumnWidth(min:ideal:) -->
-                <ColumnDefinition x:Name="SidebarColumn" Width="340" MinWidth="260" MaxWidth="600" />
+                <ColumnDefinition x:Name="SidebarColumn" Width="380" MinWidth="340" MaxWidth="600" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" MinWidth="320" />
             </Grid.ColumnDefinitions>
@@ -76,17 +76,22 @@
                          below stays monochrome: those are actions. -->
                     <SelectorBarItem x:Name="ChangesTab" Text="Changes">
                         <SelectorBarItem.Icon>
-                            <FontIcon Glyph="&#xE70F;" FontSize="15" Foreground="{ThemeResource GHChangesBrush}" />
+                            <FontIcon Glyph="&#xE70F;" FontSize="15" />
                         </SelectorBarItem.Icon>
                     </SelectorBarItem>
                     <SelectorBarItem x:Name="HistoryTab" Text="History">
                         <SelectorBarItem.Icon>
-                            <FontIcon Glyph="&#xE81C;" FontSize="15" Foreground="{ThemeResource GHHistoryBrush}" />
+                            <FontIcon Glyph="&#xE81C;" FontSize="15" />
+                        </SelectorBarItem.Icon>
+                    </SelectorBarItem>
+                    <SelectorBarItem x:Name="GitgraphTab" Text="Graph">
+                        <SelectorBarItem.Icon>
+                            <FontIcon Glyph="&#xE8B3;" FontSize="15" />
                         </SelectorBarItem.Icon>
                     </SelectorBarItem>
                     <SelectorBarItem x:Name="KanbanTab" Text="Kanban">
                         <SelectorBarItem.Icon>
-                            <FontIcon Glyph="&#xE8A9;" FontSize="15" Foreground="{ThemeResource GHKanbanBrush}" />
+                            <FontIcon Glyph="&#xE8A9;" FontSize="15" />
                         </SelectorBarItem.Icon>
                     </SelectorBarItem>
                 </SelectorBar>
@@ -121,7 +126,7 @@
                             <DropDownButton x:Name="RepositoryButton" Height="32" MinWidth="150" MaxWidth="260"
                                             HorizontalContentAlignment="Left">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE82D;" Foreground="{ThemeResource GHNeutralBrush}" />
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE82D;" />
                                     <TextBlock x:Name="RepositoryButtonText" Text="Open Repository"
                                                TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 </StackPanel>
@@ -137,7 +142,7 @@
                             <DropDownButton x:Name="BranchButton" Height="32" MinWidth="150" MaxWidth="260"
                                             HorizontalContentAlignment="Left">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xED25;" Foreground="{ThemeResource GHChangesBrush}" />
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xED25;" />
                                     <TextBlock x:Name="BranchButtonText" Text="Branch"
                                                TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 </StackPanel>
@@ -161,7 +166,7 @@
                             <DropDownButton x:Name="IdentityButton" Height="32" MaxWidth="180"
                                             HorizontalContentAlignment="Left">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE77B;" Foreground="{ThemeResource GHKanbanBrush}" />
+                                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE77B;" />
                                     <TextBlock x:Name="IdentityButtonText" Text="Identity"
                                                TextTrimming="CharacterEllipsis" MaxLines="1" />
                                 </StackPanel>
@@ -205,22 +210,22 @@
                                         ToolTipService.ToolTip="Side-by-side diff"
                                         Click="SideBySideToggle_Click">
                         <AppBarToggleButton.Icon>
-                            <FontIcon Glyph="&#xE8A3;" Foreground="{ThemeResource GHChangesBrush}" />
+                            <FontIcon Glyph="&#xE8A3;" />
                         </AppBarToggleButton.Icon>
                     </AppBarToggleButton>
                     <AppBarButton Label="Fetch" Command="{x:Bind ViewModel.FetchCommand}" ToolTipService.ToolTip="Fetch from remote">
                         <AppBarButton.Icon>
-                            <FontIcon Glyph="&#xE72C;" Foreground="{ThemeResource GHModifiedBrush}" />
+                            <FontIcon Glyph="&#xE72C;" />
                         </AppBarButton.Icon>
                     </AppBarButton>
                     <AppBarButton Label="Pull Request" ToolTipService.ToolTip="Open pull request (Ctrl+R)" Click="CreatePullRequest_Click">
                         <AppBarButton.Icon>
-                            <FontIcon Glyph="&#xE724;" Foreground="{ThemeResource GHAdditionBrush}" />
+                            <FontIcon Glyph="&#xE724;" />
                         </AppBarButton.Icon>
                     </AppBarButton>
                     <AppBarButton Label="Merge" ToolTipService.ToolTip="Merge into current branch" Click="MergeBranch_Click">
                         <AppBarButton.Icon>
-                            <FontIcon Glyph="&#xE8B1;" Foreground="{ThemeResource GHRenamedBrush}" />
+                            <FontIcon Glyph="&#xE8B1;" />
                         </AppBarButton.Icon>
                     </AppBarButton>
                     <AppBarButton Icon="More" LabelPosition="Collapsed" ToolTipService.ToolTip="Repository actions">

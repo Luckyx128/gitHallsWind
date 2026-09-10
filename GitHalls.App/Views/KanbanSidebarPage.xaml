@@ -55,7 +55,7 @@
                     Visibility="Collapsed">
             <Border Style="{StaticResource GHEmptyStateTileStyle}"
                     Background="{ThemeResource GHKanbanTintBrush}">
-                <FontIcon Glyph="&#xE71B;" FontSize="22" Foreground="{ThemeResource GHKanbanBrush}" />
+                <FontIcon Glyph="&#xE71B;" FontSize="22" />
             </Border>
             <TextBlock Text="No Jira account connected yet."
                        HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"

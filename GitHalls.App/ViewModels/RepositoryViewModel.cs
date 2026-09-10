@@ -271,10 +271,14 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     public bool HasSelectedChange => SelectedChange != null;
 
+    public GitgraphViewModel GitgraphViewModel { get; }
+
     public RepositoryViewModel(GitService gitService, SettingsStore settingsStore)
     {
         _gitService = gitService;
         _settingsStore = settingsStore;
+        
+        GitgraphViewModel = new GitgraphViewModel(_gitService, this);
 
         // Captured once, here, on the UI thread: FileSystemWatcher raises its
         // events on a threadpool thread, where GetForCurrentThread() is null.

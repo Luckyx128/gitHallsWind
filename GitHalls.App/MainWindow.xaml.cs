@@ -13,7 +13,7 @@ namespace GitHalls.App;
 
 public sealed partial class MainWindow : Window
 {
-    private const double DefaultSidebarMinWidth = 260;
+    private const double DefaultSidebarMinWidth = 340;
 
     private readonly GitService _gitService = new();
     private readonly PlatformActions _platformActions = new();
@@ -106,6 +106,16 @@ public sealed partial class MainWindow : Window
             {
                 board.SettingsRequested += (_, _) => OpenSettings();
                 board.IssueOpened += (_, issue) => OpenIssue(issue);
+            }
+        }
+        else if (sender.SelectedItem == GitgraphTab)
+        {
+            // Empty sidebar for graph, or we could add a list of branches later.
+            SidebarFrame.Content = null; 
+            ContentFrame.Navigate(typeof(GitgraphPage), ViewModel, suppressInfo);
+            if (ContentFrame.Content is GitgraphPage page)
+            {
+                _ = page.ViewModel.LoadAsync();
             }
         }
         else if (sender.SelectedItem == HistoryTab)
@@ -442,23 +452,61 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>Collapses the sidebar to zero width and back, remembering the width it had.</summary>
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _sidebarAnimTimer;
+    private double _sidebarAnimTarget;
+    private double _sidebarAnimCurrent;
+
     private void ToggleSidebar_Click(object sender, RoutedEventArgs e)
     {
         if (SidebarColumn.ActualWidth > 0)
         {
             _restoreSidebarWidth = SidebarColumn.ActualWidth;
             SidebarColumn.MinWidth = 0;
-            SidebarColumn.Width = new GridLength(0);
-            Sidebar.Visibility = Visibility.Collapsed;
+            _sidebarAnimTarget = 0;
+            _sidebarAnimCurrent = SidebarColumn.ActualWidth;
             SidebarSplitter.Visibility = Visibility.Collapsed;
         }
         else
         {
-            SidebarColumn.MinWidth = DefaultSidebarMinWidth;
-            SidebarColumn.Width = new GridLength(_restoreSidebarWidth);
             Sidebar.Visibility = Visibility.Visible;
-            SidebarSplitter.Visibility = Visibility.Visible;
+            SidebarColumn.MinWidth = 0; // Keep 0 during animation
+            _sidebarAnimTarget = _restoreSidebarWidth;
+            _sidebarAnimCurrent = SidebarColumn.ActualWidth;
         }
+
+        if (_sidebarAnimTimer == null)
+        {
+            _sidebarAnimTimer = DispatcherQueue.CreateTimer();
+            _sidebarAnimTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60fps
+            _sidebarAnimTimer.Tick += (s, args) =>
+            {
+                var diff = _sidebarAnimTarget - _sidebarAnimCurrent;
+                if (Math.Abs(diff) < 1.0)
+                {
+                    _sidebarAnimCurrent = _sidebarAnimTarget;
+                    SidebarColumn.Width = new GridLength(_sidebarAnimCurrent);
+                    _sidebarAnimTimer.Stop();
+                    
+                    if (_sidebarAnimTarget == 0)
+                    {
+                        Sidebar.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        SidebarColumn.MinWidth = DefaultSidebarMinWidth;
+                        SidebarSplitter.Visibility = Visibility.Visible;
+                    }
+                }
+                else
+                {
+                    // Ease out
+                    _sidebarAnimCurrent += diff * 0.3;
+                    SidebarColumn.Width = new GridLength(_sidebarAnimCurrent);
+                }
+            };
+        }
+        
+        _sidebarAnimTimer.Start();
     }
 
     private void SideBySideToggle_Click(object sender, RoutedEventArgs e)

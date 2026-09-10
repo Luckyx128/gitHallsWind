@@ -8,8 +8,10 @@ public class Commit
     public string AuthorEmail { get; }
     public DateTimeOffset Date { get; }
     public string Message { get; }
+    public IReadOnlyList<string> Parents { get; }
+    public IReadOnlyList<string> Refs { get; }
 
-    public Commit(string hash, string authorName, string authorEmail, DateTimeOffset date, string message)
+    public Commit(string hash, string authorName, string authorEmail, DateTimeOffset date, string message, IReadOnlyList<string>? parents = null, IReadOnlyList<string>? refs = null)
     {
         Hash = hash;
         ShortHash = hash.Length >= 7 ? hash.Substring(0, 7) : hash;
@@ -17,6 +19,8 @@ public class Commit
         AuthorEmail = authorEmail;
         Date = date;
         Message = message;
+        Parents = parents ?? Array.Empty<string>();
+        Refs = refs ?? Array.Empty<string>();
     }
 
     /// <summary>First line of the message — what the history list shows.</summary>

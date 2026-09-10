@@ -18,7 +18,7 @@
         <StackPanel x:Name="PlaceholderPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
             <Border Style="{StaticResource GHEmptyStateTileStyle}"
                     Background="{ThemeResource GHHistoryTintBrush}">
-                <FontIcon Glyph="&#xE823;" FontSize="22" Foreground="{ThemeResource GHHistoryBrush}" />
+                <FontIcon Glyph="&#xE823;" FontSize="22" />
             </Border>
             <TextBlock x:Name="PlaceholderText" Text="Select a commit"
                        HorizontalAlignment="Center"
