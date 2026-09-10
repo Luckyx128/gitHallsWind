@@ -1,13 +1,13 @@
 using GitHalls.Core.Models;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace GitHalls.App.Models;
 
-public class FileChangeGroup : List<FileChange>
+public class FileChangeGroup : ObservableCollection<FileChange>
 {
     public string Name { get; }
 
-    public FileChangeGroup(string name, IEnumerable<FileChange> items) : base(items)
+    public FileChangeGroup(string name)
     {
         Name = name;
     }

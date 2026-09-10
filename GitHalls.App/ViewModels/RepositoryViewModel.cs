@@ -268,18 +268,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     public IReadOnlyList<FileChange> StagedChanges => Changes.Where(c => c.IsStaged).ToList();
     public IReadOnlyList<FileChange> UnstagedChanges => Changes.Where(c => !c.IsStaged).ToList();
 
-    public IReadOnlyList<GitHalls.App.Models.FileChangeGroup> GroupedChanges
-    {
-        get
-        {
-            var groups = new List<GitHalls.App.Models.FileChangeGroup>();
-            var staged = StagedChanges;
-            var unstaged = UnstagedChanges;
-            if (staged.Count > 0) groups.Add(new GitHalls.App.Models.FileChangeGroup("Staged Changes", staged));
-            if (unstaged.Count > 0) groups.Add(new GitHalls.App.Models.FileChangeGroup("Unstaged Changes", unstaged));
-            return groups;
-        }
-    }
+    public GitHalls.App.Models.FileChangeGroup StagedGroup { get; } = new("Staged Changes");
+    public GitHalls.App.Models.FileChangeGroup UnstagedGroup { get; } = new("Unstaged Changes");
+    public ObservableCollection<GitHalls.App.Models.FileChangeGroup> GroupedChanges { get; } = new();
 
     public bool HasStagedChanges => Changes.Any(c => c.IsStaged);
     public bool HasUnstagedChanges => Changes.Any(c => !c.IsStaged);
@@ -738,6 +729,27 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void SyncGroup(GitHalls.App.Models.FileChangeGroup group, IReadOnlyList<FileChange> current)
+    {
+        for (int i = group.Count - 1; i >= 0; i--)
+        {
+            if (!current.Any(s => s.Path == group[i].Path)) group.RemoveAt(i);
+        }
+
+        foreach (var change in current)
+        {
+            var existing = group.FirstOrDefault(c => c.Path == change.Path);
+            if (existing == null)
+            {
+                group.Add(change);
+            }
+            else if (existing.IndexStatus != change.IndexStatus || existing.WorkTreeStatus != change.WorkTreeStatus)
+            {
+                group[group.IndexOf(existing)] = change;
+            }
+        }
+    }
+
     private void MergeChanges(IReadOnlyList<FileChange> status)
     {
         for (int i = Changes.Count - 1; i >= 0; i--)
@@ -758,12 +770,23 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
             }
         }
 
+        var staged = status.Where(c => c.IsStaged).ToList();
+        var unstaged = status.Where(c => !c.IsStaged).ToList();
+
+        SyncGroup(StagedGroup, staged);
+        SyncGroup(UnstagedGroup, unstaged);
+
+        if (StagedGroup.Count > 0 && !GroupedChanges.Contains(StagedGroup)) GroupedChanges.Insert(0, StagedGroup);
+        else if (StagedGroup.Count == 0 && GroupedChanges.Contains(StagedGroup)) GroupedChanges.Remove(StagedGroup);
+
+        if (UnstagedGroup.Count > 0 && !GroupedChanges.Contains(UnstagedGroup)) GroupedChanges.Add(UnstagedGroup);
+        else if (UnstagedGroup.Count == 0 && GroupedChanges.Contains(UnstagedGroup)) GroupedChanges.Remove(UnstagedGroup);
+
         // All derived from the list, and none is recomputed on its own.
         OnPropertyChanged(nameof(StagedState));
         OnPropertyChanged(nameof(CanCommit));
         OnPropertyChanged(nameof(StagedChanges));
         OnPropertyChanged(nameof(UnstagedChanges));
-        OnPropertyChanged(nameof(GroupedChanges));
         OnPropertyChanged(nameof(HasStagedChanges));
         OnPropertyChanged(nameof(HasUnstagedChanges));
         OnPropertyChanged(nameof(ConflictedChanges));
