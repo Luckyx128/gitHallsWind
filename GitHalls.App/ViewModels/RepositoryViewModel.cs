@@ -266,8 +266,23 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     /// <summary>Staged files only — what the suggestion and the commit actually act on.</summary>
     public IReadOnlyList<FileChange> StagedChanges => Changes.Where(c => c.IsStaged).ToList();
+    public IReadOnlyList<FileChange> UnstagedChanges => Changes.Where(c => !c.IsStaged).ToList();
+
+    public IReadOnlyList<GitHalls.App.Models.FileChangeGroup> GroupedChanges
+    {
+        get
+        {
+            var groups = new List<GitHalls.App.Models.FileChangeGroup>();
+            var staged = StagedChanges;
+            var unstaged = UnstagedChanges;
+            if (staged.Count > 0) groups.Add(new GitHalls.App.Models.FileChangeGroup("Staged Changes", staged));
+            if (unstaged.Count > 0) groups.Add(new GitHalls.App.Models.FileChangeGroup("Unstaged Changes", unstaged));
+            return groups;
+        }
+    }
 
     public bool HasStagedChanges => Changes.Any(c => c.IsStaged);
+    public bool HasUnstagedChanges => Changes.Any(c => !c.IsStaged);
 
     public bool HasSelectedChange => SelectedChange != null;
 
@@ -747,7 +762,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(StagedState));
         OnPropertyChanged(nameof(CanCommit));
         OnPropertyChanged(nameof(StagedChanges));
+        OnPropertyChanged(nameof(UnstagedChanges));
+        OnPropertyChanged(nameof(GroupedChanges));
         OnPropertyChanged(nameof(HasStagedChanges));
+        OnPropertyChanged(nameof(HasUnstagedChanges));
         OnPropertyChanged(nameof(ConflictedChanges));
         OnPropertyChanged(nameof(HasConflicts));
         OnPropertyChanged(nameof(ConflictSummary));
