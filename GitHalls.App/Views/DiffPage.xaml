@@ -41,6 +41,30 @@
                               FontSize="12" Click="SideToggle_Click" Tag="WorkingTree" />
                 <ToggleButton x:Name="StagedToggle" MinWidth="0" Padding="10,3" CornerRadius="4"
                               FontSize="12" Click="SideToggle_Click" Tag="Index" />
+                <Button Style="{StaticResource GHIconButtonStyle}" ToolTipService.ToolTip="Diff Settings">
+                    <FontIcon Glyph="&#xE713;" FontSize="14" />
+                    <Button.Flyout>
+                        <Flyout>
+                            <StackPanel Spacing="12" Width="240">
+                                <TextBlock Text="Diff Settings" Style="{StaticResource GHSectionHeaderTextStyle}" />
+                                
+                                <ComboBox x:Name="FontFamilyCombo" Header="Font Family" HorizontalAlignment="Stretch" SelectionChanged="Settings_Changed">
+                                    <ComboBoxItem Content="Cascadia Mono" />
+                                    <ComboBoxItem Content="Consolas" />
+                                    <ComboBoxItem Content="Courier New" />
+                                </ComboBox>
+                                
+                                <Slider x:Name="FontSizeSlider" Header="Font Size" Minimum="8" Maximum="24" Value="13" ValueChanged="Settings_Changed" />
+                                
+                                <ComboBox x:Name="ThemeCombo" Header="Theme" HorizontalAlignment="Stretch" SelectionChanged="Settings_Changed">
+                                    <ComboBoxItem Content="Auto" />
+                                    <ComboBoxItem Content="Light" />
+                                    <ComboBoxItem Content="Dark" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
             </StackPanel>
         </Grid>
 

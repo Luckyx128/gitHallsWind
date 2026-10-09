@@ -55,10 +55,21 @@ public sealed class DiffTextTheme
 
     public required IReadOnlyDictionary<DiffTokenKind, Color> Tokens { get; init; }
 
-    public const string FontFamily = "Cascadia Mono, Consolas, Courier New";
-    public const double FontSize = 13;
-    public const double GutterFontSize = 12;
-    public const double LineHeight = 19;
+    public static string FontFamily { get; set; } = "Cascadia Mono, Consolas, Courier New";
+    public static double FontSize { get; set; } = 13;
+    public static double GutterFontSize { get; set; } = 12;
+    public static double LineHeight { get; set; } = 19;
+
+    public static event EventHandler? MetricsChanged;
+
+    public static void UpdateMetrics(string fontFamily, double fontSize, double gutterFontSize, double lineHeight)
+    {
+        FontFamily = fontFamily;
+        FontSize = fontSize;
+        GutterFontSize = gutterFontSize;
+        LineHeight = lineHeight;
+        MetricsChanged?.Invoke(null, EventArgs.Empty);
+    }
 
     public Color TokenColor(DiffTokenKind kind) => Tokens.TryGetValue(kind, out var color) ? color : BaseText;
 

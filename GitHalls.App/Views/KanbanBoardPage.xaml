@@ -2,6 +2,7 @@
     x:Class="GitHalls.App.Views.KanbanBoardPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:jira="using:GitHalls.Core.Jira"
     Background="Transparent">
 
     <Page.Resources>
@@ -19,6 +20,21 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
         </Style>
+
+        <DataTemplate x:Key="JiraIssueCardTemplate" x:DataType="jira:JiraIssue">
+            <Grid Padding="12,10,12,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                  CornerRadius="4" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                  ToolTipService.ToolTip="{x:Bind Summary}">
+                <Grid.ContextFlyout>
+                    <MenuFlyout Opening="CardMenu_Opening" />
+                </Grid.ContextFlyout>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="{x:Bind Summary}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{x:Bind Key}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    <TextBlock Text="{x:Bind AssigneeName}" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
     </Page.Resources>
 
     <Grid>
@@ -35,6 +51,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
@@ -42,15 +59,18 @@
                 <TextBlock x:Name="CountText" Style="{StaticResource GHCaptionTextStyle}" />
             </StackPanel>
 
+            <Button x:Name="CreateIssueButton" Grid.Column="1" Content="Create issue" Style="{StaticResource GHPrimaryButtonStyle}"
+                    Click="CreateIssue_Click" VerticalAlignment="Center" Visibility="Collapsed" />
+
             <!-- Narrows what is already on the board; never asks Jira. -->
-            <TextBox x:Name="FilterTextBox" Grid.Column="1" Width="220" Height="32"
+            <TextBox x:Name="FilterTextBox" Grid.Column="2" Width="220" Height="32"
                      PlaceholderText="Filter cards"
                      TextChanged="FilterTextBox_TextChanged" />
 
-            <ProgressRing x:Name="LoadingRing" Grid.Column="2" Width="18" Height="18"
+            <ProgressRing x:Name="LoadingRing" Grid.Column="3" Width="18" Height="18"
                           IsActive="False" Visibility="Collapsed" VerticalAlignment="Center" />
 
-            <Button Grid.Column="3" Width="32" Height="32" Padding="0"
+            <Button Grid.Column="4" Width="32" Height="32" Padding="0"
                     Content="&#xE72C;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14"
                     Click="Refresh_Click"
                     ToolTipService.ToolTip="Run the query again" />

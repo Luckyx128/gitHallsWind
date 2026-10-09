@@ -1,3 +1,4 @@
+using GitHalls.App.Themes;
 using GitHalls.App.ViewModels;
 using GitHalls.Core.Diff;
 using GitHalls.Core.Markdown;
@@ -19,6 +20,39 @@ public sealed partial class DiffPage : Page
         {
             if (_viewModel != null) await _viewModel.ApplyHunkAsync(hunk);
         };
+        
+        // Initialize settings UI
+        foreach (ComboBoxItem item in FontFamilyCombo.Items)
+        {
+            if (item.Content as string == DiffTextTheme.FontFamily)
+            {
+                FontFamilyCombo.SelectedItem = item;
+                break;
+            }
+        }
+        if (FontFamilyCombo.SelectedItem == null && FontFamilyCombo.Items.Count > 0)
+            FontFamilyCombo.SelectedIndex = 0;
+
+        FontSizeSlider.Value = DiffTextTheme.FontSize;
+        ThemeCombo.SelectedIndex = 0; // Auto
+    }
+
+    private void Settings_Changed(object sender, RoutedEventArgs e)
+    {
+        if (FontFamilyCombo?.SelectedItem is ComboBoxItem fontItem && fontItem.Content is string font && FontSizeSlider != null && ThemeCombo != null)
+        {
+            DiffTextTheme.UpdateMetrics(font, FontSizeSlider.Value, FontSizeSlider.Value - 1, FontSizeSlider.Value + 6);
+            
+            if (ThemeCombo.SelectedItem is ComboBoxItem themeItem && themeItem.Content is string themeStr)
+            {
+                DiffView.RequestedTheme = themeStr switch
+                {
+                    "Light" => ElementTheme.Light,
+                    "Dark" => ElementTheme.Dark,
+                    _ => ElementTheme.Default
+                };
+            }
+        }
     }
 
     /// <summary>

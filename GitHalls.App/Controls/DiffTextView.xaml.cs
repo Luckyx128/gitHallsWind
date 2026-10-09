@@ -203,9 +203,9 @@ public sealed partial class DiffTextView : UserControl
         // Left, not the default Stretch: a stretched text block reports the
         // width it was given rather than the width its content needs.
         TextLayer.HorizontalAlignment = HorizontalAlignment.Left;
-        TextLayer.FontFamily = new FontFamily(DiffTextTheme.FontFamily);
-        TextLayer.FontSize = DiffTextTheme.FontSize;
-        TextLayer.LineHeight = DiffTextTheme.LineHeight;
+        
+        ApplyMetrics();
+        DiffTextTheme.MetricsChanged += (_, _) => ApplyMetrics();
 
         BuildContextMenu();
 
@@ -873,6 +873,16 @@ public sealed partial class DiffTextView : UserControl
     }
 
     // MARK: - Copy
+
+    private void ApplyMetrics()
+    {
+        TextLayer.FontFamily = new FontFamily(DiffTextTheme.FontFamily);
+        TextLayer.FontSize = DiffTextTheme.FontSize;
+        TextLayer.LineHeight = DiffTextTheme.LineHeight;
+
+        UpdateContentSize();
+        RepaintLayers(force: true);
+    }
 
     private void BuildContextMenu()
     {
