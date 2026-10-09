@@ -95,6 +95,9 @@ internal sealed class JiraTransitionDto
 internal sealed class JiraTransitionRequest
 {
     public JiraIdDto Transition { get; set; } = new();
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JiraUpdateIssueFieldsDto? Fields { get; set; }
 }
 
 internal sealed class JiraIdDto
@@ -126,6 +129,65 @@ internal sealed class JiraErrorResponse
     public Dictionary<string, string>? Errors { get; set; }
 }
 
+internal sealed class JiraCreateIssueRequest
+{
+    public JiraCreateIssueFieldsDto? Fields { get; set; }
+}
+
+internal sealed class JiraCreateIssueFieldsDto
+{
+    public JiraProjectDto? Project { get; set; }
+    public string? Summary { get; set; }
+    public JsonElement? Description { get; set; }
+
+    [JsonPropertyName("issuetype")]
+    public JiraNamedDto? IssueType { get; set; }
+
+    public JiraNamedDto? Priority { get; set; }
+    public List<string>? Labels { get; set; }
+    public JiraUserDto? Assignee { get; set; }
+}
+
+internal sealed class JiraProjectDto
+{
+    public string? Key { get; set; }
+    public string? Id { get; set; }
+}
+
+internal sealed class JiraCreateIssueResponse
+{
+    public string? Id { get; set; }
+    public string? Key { get; set; }
+    public string? Self { get; set; }
+}
+
+internal sealed class JiraUpdateIssueRequest
+{
+    public JiraUpdateIssueFieldsDto? Fields { get; set; }
+}
+
+internal sealed class JiraUpdateIssueFieldsDto
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Summary { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Description { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("issuetype")]
+    public JiraNamedDto? IssueType { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JiraNamedDto? Priority { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Labels { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JiraUserDto? Assignee { get; set; }
+}
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(JiraSearchRequest))]
 [JsonSerializable(typeof(JiraSearchResponse))]
@@ -135,6 +197,9 @@ internal sealed class JiraErrorResponse
 [JsonSerializable(typeof(JiraAssigneeRequest))]
 [JsonSerializable(typeof(JiraMyselfResponse))]
 [JsonSerializable(typeof(JiraErrorResponse))]
+[JsonSerializable(typeof(JiraCreateIssueRequest))]
+[JsonSerializable(typeof(JiraCreateIssueResponse))]
+[JsonSerializable(typeof(JiraUpdateIssueRequest))]
 internal partial class JiraJsonContext : JsonSerializerContext
 {
 }

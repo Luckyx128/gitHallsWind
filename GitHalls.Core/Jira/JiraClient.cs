@@ -125,11 +125,25 @@ public sealed class JiraClient
     /// the status code is the whole answer, which is why nothing here parses
     /// one — handing an empty body to Deserialize would read as malformed.
     /// </summary>
-    public async Task TransitionAsync(string key, string transitionId, CancellationToken cancellationToken = default)
+    public async Task TransitionAsync(string key, string transitionId, JiraIssueUpdateParameters? fields = null, CancellationToken cancellationToken = default)
     {
         var request = Request(HttpMethod.Post, TransitionsPath(key));
-        SetJsonBody(request, new JiraTransitionRequest { Transition = new JiraIdDto { Id = transitionId } },
-                    JiraJsonContext.Default.JiraTransitionRequest);
+
+        var body = new JiraTransitionRequest { Transition = new JiraIdDto { Id = transitionId } };
+        if (fields != null)
+        {
+            body.Fields = new JiraUpdateIssueFieldsDto
+            {
+                Summary = fields.Summary,
+                Description = fields.Description,
+                IssueType = fields.IssueTypeName != null ? new JiraNamedDto { Name = fields.IssueTypeName } : null,
+                Priority = fields.PriorityName != null ? new JiraNamedDto { Name = fields.PriorityName } : null,
+                Labels = fields.Labels?.ToList(),
+                Assignee = fields.AssigneeAccountId != null ? new JiraUserDto { AccountId = fields.AssigneeAccountId } : null
+            };
+        }
+
+        SetJsonBody(request, body, JiraJsonContext.Default.JiraTransitionRequest);
 
         await SendAsync(request, cancellationToken);
     }
@@ -143,6 +157,56 @@ public sealed class JiraClient
         var request = Request(HttpMethod.Put, IssuePath + Uri.EscapeDataString(key) + "/assignee");
         SetJsonBody(request, new JiraAssigneeRequest { AccountId = accountId },
                     JiraJsonContext.Default.JiraAssigneeRequest);
+
+        await SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Creates a new issue. Returns the key of the created issue.</summary>
+    public async Task<string> CreateIssueAsync(JiraIssueCreateParameters parameters, CancellationToken cancellationToken = default)
+    {
+        var request = Request(HttpMethod.Post, IssuePath.TrimEnd('/'));
+
+        var body = new JiraCreateIssueRequest
+        {
+            Fields = new JiraCreateIssueFieldsDto
+            {
+                Project = new JiraProjectDto { Key = parameters.ProjectKey },
+                Summary = parameters.Summary,
+                Description = parameters.Description,
+                IssueType = new JiraNamedDto { Name = parameters.IssueTypeName },
+                Priority = parameters.PriorityName != null ? new JiraNamedDto { Name = parameters.PriorityName } : null,
+                Labels = parameters.Labels?.ToList(),
+                Assignee = parameters.AssigneeAccountId != null ? new JiraUserDto { AccountId = parameters.AssigneeAccountId } : null
+            }
+        };
+
+        SetJsonBody(request, body, JiraJsonContext.Default.JiraCreateIssueRequest);
+
+        var responseBody = await SendAsync(request, cancellationToken);
+        var response = Deserialize(responseBody, JiraJsonContext.Default.JiraCreateIssueResponse);
+
+        return response?.Key ?? throw JiraException.Malformed();
+    }
+
+    /// <summary>Updates an existing issue. Jira answers 204 with no body.</summary>
+    public async Task UpdateIssueAsync(string key, JiraIssueUpdateParameters parameters, CancellationToken cancellationToken = default)
+    {
+        var request = Request(HttpMethod.Put, IssuePath + Uri.EscapeDataString(key));
+
+        var body = new JiraUpdateIssueRequest
+        {
+            Fields = new JiraUpdateIssueFieldsDto
+            {
+                Summary = parameters.Summary,
+                Description = parameters.Description,
+                IssueType = parameters.IssueTypeName != null ? new JiraNamedDto { Name = parameters.IssueTypeName } : null,
+                Priority = parameters.PriorityName != null ? new JiraNamedDto { Name = parameters.PriorityName } : null,
+                Labels = parameters.Labels?.ToList(),
+                Assignee = parameters.AssigneeAccountId != null ? new JiraUserDto { AccountId = parameters.AssigneeAccountId } : null
+            }
+        };
+
+        SetJsonBody(request, body, JiraJsonContext.Default.JiraUpdateIssueRequest);
 
         await SendAsync(request, cancellationToken);
     }
