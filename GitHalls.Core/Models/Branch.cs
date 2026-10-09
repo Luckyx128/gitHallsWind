@@ -7,13 +7,28 @@ public class Branch
     public bool IsCurrent { get; }
     public bool IsRemote { get; }
     public string? RemoteName { get; }
+    public bool HasUpstream { get; }
+    public int Ahead { get; }
+    public int Behind { get; }
+    public bool IsLocalOnly => !IsRemote && !HasUpstream;
+    public bool HasPendingPush => !IsRemote && (!HasUpstream || Ahead > 0);
 
-    public Branch(string name, bool isCurrent, bool isRemote = false, string? remoteName = null)
+    public Branch(
+        string name,
+        bool isCurrent,
+        bool isRemote = false,
+        string? remoteName = null,
+        bool hasUpstream = false,
+        int ahead = 0,
+        int behind = 0)
     {
         Name = name;
         IsCurrent = isCurrent;
         IsRemote = isRemote;
         RemoteName = remoteName;
+        HasUpstream = hasUpstream;
+        Ahead = ahead;
+        Behind = behind;
     }
 
     /// <summary>

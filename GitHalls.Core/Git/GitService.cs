@@ -153,9 +153,17 @@ public class GitService
 
     private const string GraphLogFormat = "%H%n%P%n%D%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
 
-    public async Task<IReadOnlyList<Commit>> GetGraphCommitsAsync(string repoPath, int maxCount = 200, string since = "3.months.ago", CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Commit>> GetGraphCommitsAsync(string repoPath, int maxCount = 200, string since = "3.months.ago", bool allBranches = true, CancellationToken cancellationToken = default)
     {
-        var args = new[] { "log", "--all", "--date-order", $"-n {maxCount}", $"--since={since}", $"--pretty=format:{GraphLogFormat}" };
+        var args = new List<string> { "log" };
+        if (allBranches)
+        {
+            args.Add("--all");
+        }
+        args.Add("--date-order");
+        args.Add($"-n {maxCount}");
+        args.Add($"--since={since}");
+        args.Add($"--pretty=format:{GraphLogFormat}");
 
         try
         {
@@ -353,7 +361,10 @@ public class GitService
 
     public async Task<IReadOnlyList<Branch>> GetBranchesAsync(string repoPath, CancellationToken cancellationToken = default)
     {
-        var result = await _runner.RunAsync(repoPath, new[] { "branch", "-a", "--no-color" }, cancellationToken: cancellationToken);
+        var result = await _runner.RunAsync(
+            repoPath,
+            new[] { "for-each-ref", "--format=%(refname)|%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track,nobracket)", "refs/heads", "refs/remotes" },
+            cancellationToken: cancellationToken);
         return _branchParser.Parse(result.StandardOutput);
     }
 

@@ -57,6 +57,6 @@ public static class FilePreview
         }
 
         // Bytes are whole things; anything larger reads better rounded.
-        return unit == 0 ? $"{byteCount} {units[0]}" : $"{size:0.#} {units[unit]}";
+        return unit == 0 ? $"{byteCount} {units[0]}" : $"{size.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)} {units[unit]}";
     }
 }
