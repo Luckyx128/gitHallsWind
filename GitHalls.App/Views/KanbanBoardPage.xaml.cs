@@ -402,27 +402,19 @@ public sealed partial class KanbanBoardPage : Page
 
     private async void CreateIssue_Click(object sender, RoutedEventArgs e)
     {
-        var projectTextBox = new TextBox { Header = "Project Key", PlaceholderText = "e.g. PROJ", Width = 400 };
-        var summaryTextBox = new TextBox { Header = "Summary", Width = 400, Margin = new Thickness(0, 12, 0, 0) };
-        var typeTextBox = new TextBox { Header = "Issue Type", Text = "Task", Width = 400, Margin = new Thickness(0, 12, 0, 0) };
+        // The board's own project first: the query is usually one project's sprint.
+        var boardProject = ViewModel.Columns
+            .SelectMany(column => column.Issues)
+            .Select(issue => issue.Key.Split('-')[0])
+            .FirstOrDefault();
 
-        var dialog = new ContentDialog
+        try
         {
-            Title = "Create Issue",
-            Content = new StackPanel { Children = { projectTextBox, summaryTextBox, typeTextBox } },
-            PrimaryButtonText = "Create",
-            CloseButtonText = "Cancel",
-            XamlRoot = this.XamlRoot
-        };
-
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            await CreateIssueDialog.ShowAsync(XamlRoot, ViewModel, boardProject);
+        }
+        catch (Exception ex)
         {
-            var parameters = new JiraIssueCreateParameters(
-                ProjectKey: projectTextBox.Text,
-                Summary: summaryTextBox.Text,
-                IssueTypeName: typeTextBox.Text
-            );
-            _ = ViewModel.CreateIssueAsync(parameters);
+            ViewModel.ReportFailure("New issue", ex.Message);
         }
     }
 }

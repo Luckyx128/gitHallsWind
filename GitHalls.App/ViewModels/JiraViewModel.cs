@@ -374,21 +374,60 @@ public partial class JiraViewModel : ObservableObject
             current => current with { AssigneeAccountId = accountId, AssigneeName = accountId == null ? null : displayName },
             accountId == null ? $"{issue.Key} unassigned." : $"{issue.Key} assigned to {displayName}.");
 
-    public async Task<bool> CreateIssueAsync(JiraIssueCreateParameters parameters)
+    // MARK: - Creating
+
+    public Task<IReadOnlyList<JiraProject>> ProjectsAsync(CancellationToken cancellationToken = default) =>
+        new JiraClient(RequireCredentials()).GetProjectsAsync(cancellationToken);
+
+    public Task<IReadOnlyList<JiraIssueType>> IssueTypesAsync(string projectKey, CancellationToken cancellationToken = default) =>
+        new JiraClient(RequireCredentials()).GetIssueTypesAsync(projectKey, cancellationToken);
+
+    public Task<IReadOnlyList<JiraCreateField>> CreateFieldsAsync(string projectKey, string issueTypeId,
+                                                                  CancellationToken cancellationToken = default) =>
+        new JiraClient(RequireCredentials()).GetCreateFieldsAsync(projectKey, issueTypeId, cancellationToken);
+
+    public Task<IReadOnlyList<JiraFieldOption>> FindTeamsAsync(string query, string? autoCompleteUrl,
+                                                               CancellationToken cancellationToken = default) =>
+        new JiraClient(RequireCredentials()).FindTeamsAsync(query, autoCompleteUrl, cancellationToken);
+
+    public Task<IReadOnlyList<JiraSprint>> OpenSprintsAsync(string projectKey, CancellationToken cancellationToken = default) =>
+        new JiraClient(RequireCredentials()).GetOpenSprintsAsync(projectKey, cancellationToken);
+
+    /// <summary>
+    /// Creates the issue, then files it in <paramref name="sprint"/>: Jira's
+    /// create call always lands an issue in the backlog. Throws when Jira
+    /// refuses the create, so the form can stay open with the reason. A
+    /// refused sprint move only warns — the issue exists, and saying "failed"
+    /// would get it created twice.
+    /// </summary>
+    public async Task<string> CreateIssueAsync(JiraIssueCreateParameters parameters, JiraSprint? sprint)
     {
-        try
+        var client = new JiraClient(RequireCredentials());
+        var key = await client.CreateIssueAsync(parameters, CancellationToken.None);
+
+        if (sprint == null)
         {
-            var key = await new JiraClient(RequireCredentials()).CreateIssueAsync(parameters, CancellationToken.None);
-            ReportAction(key, $"{key} created.", failed: false);
-            _ = RefreshAsync();
-            return true;
+            ReportAction(key, $"{key} created in the backlog.", failed: false);
         }
-        catch (Exception ex)
+        else
         {
-            ReportAction("New issue", ex.Message, failed: true);
-            return false;
+            try
+            {
+                await client.MoveToSprintAsync(sprint.Id, new[] { key }, CancellationToken.None);
+                ReportAction(key, $"{key} created in {sprint.Name}.", failed: false);
+            }
+            catch (Exception ex)
+            {
+                ReportAction(key, $"{key} was created but stayed in the backlog: {ex.Message}", failed: true);
+            }
         }
+
+        _ = RefreshAsync();
+        return key;
     }
+
+    /// <summary>For a page that hit a failure the user should read in the board's banner.</summary>
+    public void ReportFailure(string issueKey, string message) => ReportAction(issueKey, message, failed: true);
 
     public Task<bool> UpdateIssueAsync(JiraIssue issue, JiraIssueUpdateParameters parameters) =>
         WriteAsync(issue,
