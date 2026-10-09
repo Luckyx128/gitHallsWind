@@ -108,21 +108,12 @@ public sealed partial class MainWindow : Window
                 board.IssueOpened += (_, issue) => OpenIssue(issue);
             }
         }
-        else if (sender.SelectedItem == GitgraphTab)
-        {
-            // Empty sidebar for graph, or we could add a list of branches later.
-            SidebarFrame.Content = null; 
-            ContentFrame.Navigate(typeof(GitgraphPage), ViewModel, suppressInfo);
-            if (ContentFrame.Content is GitgraphPage page)
-            {
-                _ = page.ViewModel.LoadAsync();
-            }
-        }
         else if (sender.SelectedItem == HistoryTab)
         {
             SidebarFrame.Navigate(typeof(HistorySidebarPage), ViewModel, suppressInfo);
             ContentFrame.Navigate(typeof(CommitDetailPage), ViewModel, suppressInfo);
             (ContentFrame.Content as CommitDetailPage)?.Update();
+            _ = ViewModel.GitgraphViewModel.LoadAsync();
         }
         else
         {

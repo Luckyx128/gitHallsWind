@@ -84,11 +84,6 @@
                             <FontIcon Glyph="&#xE81C;" FontSize="15" />
                         </SelectorBarItem.Icon>
                     </SelectorBarItem>
-                    <SelectorBarItem x:Name="GitgraphTab" Text="Graph">
-                        <SelectorBarItem.Icon>
-                            <FontIcon Glyph="&#xE8B3;" FontSize="15" />
-                        </SelectorBarItem.Icon>
-                    </SelectorBarItem>
                     <SelectorBarItem x:Name="KanbanTab" Text="Kanban">
                         <SelectorBarItem.Icon>
                             <FontIcon Glyph="&#xE8A9;" FontSize="15" />

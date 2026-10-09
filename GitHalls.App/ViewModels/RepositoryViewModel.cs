@@ -749,6 +749,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         SyncAhead = sync?.Ahead ?? 0;
         SyncBehind = sync?.Behind ?? 0;
         SyncCommand.NotifyCanExecuteChanged();
+        await GitgraphViewModel.LoadAsync();
     }
 
     /// <summary>Replaces only what actually changed, so the list doesn't flicker.</summary>

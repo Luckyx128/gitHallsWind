@@ -27,6 +27,14 @@ public partial class GitgraphViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<GitHalls.App.Models.GitTreeFileNode> _selectedCommitTree = new();
 
+    [ObservableProperty]
+    private bool _showAllBranches = true;
+
+    partial void OnShowAllBranchesChanged(bool value)
+    {
+        _ = LoadAsync();
+    }
+
     public GitgraphViewModel(GitService gitService, RepositoryViewModel repoViewModel)
     {
         _gitService = gitService;
@@ -37,7 +45,8 @@ public partial class GitgraphViewModel : ObservableObject
 
     private void RepoViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(RepositoryViewModel.RepositoryPath))
+        if (e.PropertyName == nameof(RepositoryViewModel.RepositoryPath) ||
+            (e.PropertyName == nameof(RepositoryViewModel.CurrentBranch) && !ShowAllBranches))
         {
             _ = LoadAsync();
         }
@@ -145,9 +154,14 @@ public partial class GitgraphViewModel : ObservableObject
         ErrorMessage = null;
         try
         {
-            var commits = await _gitService.GetGraphCommitsAsync(_repoViewModel.RepositoryPath);
+            var commits = await _gitService.GetGraphCommitsAsync(_repoViewModel.RepositoryPath, allBranches: ShowAllBranches);
             var graphRows = GraphBuilder.Build(commits);
             Rows = new ObservableCollection<GraphRow>(graphRows);
+
+            if (_repoViewModel.SelectedCommit != null)
+            {
+                SelectedRow = Rows.FirstOrDefault(r => r.Commit.Hash == _repoViewModel.SelectedCommit.Hash);
+            }
         }
         catch (Exception ex)
         {
