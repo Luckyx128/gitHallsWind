@@ -135,6 +135,46 @@
 
     </ResourceDictionary.ThemeDictionaries>
 
+    <!-- MARK: - Primitives -->
+
+    <!-- Typography -->
+    <FontFamily x:Key="GHMonospaceFontFamily">Cascadia Code, Consolas, Courier New</FontFamily>
+
+    <!-- Spacing -->
+    <Thickness x:Key="GHSpacingXSmall">4</Thickness>
+    <Thickness x:Key="GHSpacingSmall">8</Thickness>
+    <Thickness x:Key="GHSpacingMedium">12</Thickness>
+    <Thickness x:Key="GHSpacingLarge">16</Thickness>
+    <Thickness x:Key="GHSpacingXLarge">24</Thickness>
+    <Thickness x:Key="GHCardPadding">16,12,16,12</Thickness>
+
+    <!-- MARK: - Buttons -->
+
+    <!-- Primary action button -->
+    <Style x:Key="GHPrimaryButtonStyle" TargetType="Button">
+        <Setter Property="Style" Value="{ThemeResource AccentButtonStyle}" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Secondary/Default action button -->
+    <Style x:Key="GHSecondaryButtonStyle" TargetType="Button">
+        <Setter Property="Style" Value="{ThemeResource DefaultButtonStyle}" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="MinHeight" Value="32" />
+    </Style>
+
+    <!-- Icon button -->
+    <Style x:Key="GHIconButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
     <!-- MARK: - Surfaces -->
 
     <!-- The card that groups a block of content, as in "Configurações recomendadas". -->
@@ -143,7 +183,7 @@
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="16,12,16,12" />
+        <Setter Property="Padding" Value="{StaticResource GHCardPadding}" />
     </Style>
 
     <!-- Same card, no padding: for cards that hold a list or a scroller. -->
@@ -159,7 +199,7 @@
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="16,12,16,12" />
+        <Setter Property="Padding" Value="{StaticResource GHCardPadding}" />
     </Style>
 
     <!-- A nested surface inside a card (a badge, an inline chip). -->
