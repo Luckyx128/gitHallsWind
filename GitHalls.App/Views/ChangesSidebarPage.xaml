@@ -50,9 +50,14 @@
              are settled, so the list says so above itself rather than leaving
              them to be spotted among ordinary changes. -->
         <InfoBar x:Name="ConflictBar" Grid.Row="1" Margin="12,0,12,6"
-                 Severity="Warning" IsClosable="False"
-                 IsOpen="{x:Bind ViewModel.HasConflicts, Mode=OneWay}"
-                 Message="{x:Bind ViewModel.ConflictSummary, Mode=OneWay}" />
+                 Severity="{x:Bind ViewModel.MergeOrConflictSeverity, Mode=OneWay}" IsClosable="False"
+                 IsOpen="{x:Bind ViewModel.ShowMergeOrConflictBar, Mode=OneWay}"
+                 Title="{x:Bind ViewModel.MergeOrConflictTitle, Mode=OneWay}"
+                 Message="{x:Bind ViewModel.MergeOrConflictMessage, Mode=OneWay}">
+            <InfoBar.ActionButton>
+                <Button Content="Cancel Merge" Command="{x:Bind ViewModel.AbortMergeCommand}" Visibility="{x:Bind ViewModel.AbortMergeVisibility, Mode=OneWay}" />
+            </InfoBar.ActionButton>
+        </InfoBar>
 
         <ListView x:Name="ChangesList" Grid.Row="2" ItemsSource="{Binding Source={StaticResource GroupedChangesSource}}"
                   SelectedItem="{x:Bind ViewModel.SelectedChange, Mode=TwoWay}"
@@ -154,7 +159,7 @@
                      AcceptsReturn="True" Height="72" TextWrapping="Wrap"
                      Text="{x:Bind ViewModel.CommitDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-            <Button x:Name="CommitButton" Content="Commit" HorizontalAlignment="Stretch"
+            <Button x:Name="CommitButton" Content="{x:Bind ViewModel.CommitButtonText, Mode=OneWay}" HorizontalAlignment="Stretch"
                     Style="{StaticResource AccentButtonStyle}"
                     Command="{x:Bind ViewModel.CommitCommand}" />
         </StackPanel>

@@ -671,4 +671,9 @@ public class GitService
     {
         await _runner.RunAsync(repoPath, new[] { "merge", branchName }, cancellationToken: cancellationToken);
     }
+
+    public async Task AbortMergeAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "merge", "--abort" }, cancellationToken: cancellationToken);
+    }
 }

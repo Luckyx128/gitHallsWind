@@ -677,6 +677,49 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         if (string.IsNullOrEmpty(repoPath)) return;
 
         var status = await _gitService.GetStatusAsync(repoPath);
+
+        // Check if a merge is in progress
+        var mergeHeadPath = Path.Combine(repoPath, ".git", "MERGE_HEAD");
+        IsMerging = File.Exists(mergeHeadPath);
+
+        // Auto-stage resolved conflicts
+        var unmerged = status.Where(c => c.IndexStatus == FileChangeStatus.Unmerged || c.WorkTreeStatus == FileChangeStatus.Unmerged).ToList();
+        var stagedAny = false;
+        foreach (var change in unmerged)
+        {
+            var contentBytes = await GitService.GetWorkingTreeBytesAsync(repoPath, change.Path);
+            if (contentBytes == null) continue;
+
+            var text = System.Text.Encoding.UTF8.GetString(contentBytes);
+            if (!text.Contains("<<<<<<<") && !text.Contains("=======") && !text.Contains(">>>>>>>"))
+            {
+                await _gitService.StageAsync(repoPath, change.Path);
+                stagedAny = true;
+            }
+        }
+
+        if (stagedAny)
+        {
+            status = await _gitService.GetStatusAsync(repoPath);
+        }
+
+        // Prepopulate merge message if empty
+        if (IsMerging && string.IsNullOrEmpty(CommitSummary) && string.IsNullOrEmpty(CommitDescription))
+        {
+            var mergeMsgPath = Path.Combine(repoPath, ".git", "MERGE_MSG");
+            if (File.Exists(mergeMsgPath))
+            {
+                var msg = await File.ReadAllTextAsync(mergeMsgPath);
+                var lines = msg.Replace("\r\n", "\n").Split('\n');
+                var nonCommentLines = lines.Where(l => !l.StartsWith("#")).ToList();
+                if (nonCommentLines.Count > 0)
+                {
+                    CommitSummary = nonCommentLines[0].Trim();
+                    CommitDescription = string.Join("\n", nonCommentLines.Skip(1)).Trim();
+                }
+            }
+        }
+
         MergeChanges(status);
 
         if (SelectedChange != null)
@@ -792,6 +835,11 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ConflictedChanges));
         OnPropertyChanged(nameof(HasConflicts));
         OnPropertyChanged(nameof(ConflictSummary));
+        OnPropertyChanged(nameof(ShowMergeOrConflictBar));
+        OnPropertyChanged(nameof(MergeOrConflictTitle));
+        OnPropertyChanged(nameof(MergeOrConflictMessage));
+        OnPropertyChanged(nameof(MergeOrConflictSeverity));
+        OnPropertyChanged(nameof(AbortMergeVisibility));
         CommitCommand.NotifyCanExecuteChanged();
     }
 
@@ -1418,6 +1466,31 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     public string ConflictSummary => ConflictedChanges.Count == 1
         ? "1 file has conflicts. Resolve it, then mark it resolved."
         : $"{ConflictedChanges.Count} files have conflicts. Resolve them, then mark them resolved.";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CommitButtonText), nameof(ShowMergeOrConflictBar), nameof(MergeOrConflictTitle), nameof(MergeOrConflictMessage), nameof(MergeOrConflictSeverity), nameof(ShowAbortMergeButton), nameof(AbortMergeVisibility))]
+    private bool _isMerging;
+
+    public string CommitButtonText => IsMerging ? "Commit Merge" : "Commit";
+
+    public bool ShowMergeOrConflictBar => IsMerging || HasConflicts;
+
+    public string MergeOrConflictTitle => (IsMerging && HasConflicts) ? "Merge in progress (Conflicts)" :
+                                          IsMerging ? "Merge in progress" : "Conflicts";
+
+    public string MergeOrConflictMessage => HasConflicts ? ConflictSummary : "Commit to finalize the merge.";
+
+    public Microsoft.UI.Xaml.Controls.InfoBarSeverity MergeOrConflictSeverity => HasConflicts ? Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning : Microsoft.UI.Xaml.Controls.InfoBarSeverity.Informational;
+
+    public bool ShowAbortMergeButton => IsMerging;
+
+    public Microsoft.UI.Xaml.Visibility AbortMergeVisibility => IsMerging ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+    [RelayCommand]
+    public async Task AbortMergeAsync()
+    {
+        await RunGitAsync(path => _gitService.AbortMergeAsync(path));
+    }
 
     /// <summary>
     /// Tells git the file is settled. Resolving <em>is</em> staging — there is
