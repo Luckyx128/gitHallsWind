@@ -15,4 +15,11 @@ public interface IJiraService
     
     Task<string> CreateIssueAsync(JiraCredentials credentials, JiraIssueCreateParameters parameters, CancellationToken cancellationToken = default);
     Task UpdateIssueAsync(JiraCredentials credentials, string key, JiraIssueUpdateParameters parameters, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JiraProject>> GetProjectsAsync(JiraCredentials credentials, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JiraIssueType>> GetIssueTypesAsync(JiraCredentials credentials, string projectKey, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JiraCreateField>> GetCreateFieldsAsync(JiraCredentials credentials, string projectKey, string issueTypeId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JiraFieldOption>> FindTeamsAsync(JiraCredentials credentials, string query, string? autoCompleteUrl = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JiraSprint>> GetOpenSprintsAsync(JiraCredentials credentials, string projectKey, CancellationToken cancellationToken = default);
+    Task MoveToSprintAsync(JiraCredentials credentials, int sprintId, IEnumerable<string> keys, CancellationToken cancellationToken = default);
+    Uri BrowseUrl(JiraCredentials credentials, string key);
 }

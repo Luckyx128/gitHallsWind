@@ -13,30 +13,37 @@ public class JiraClientTests
     /// <summary>Answers every request with one canned response, and records what was asked.</summary>
     private sealed class StubHandler : HttpMessageHandler
     {
-        private readonly HttpStatusCode _status;
-        private readonly string _body;
-        private readonly Action<HttpResponseMessage>? _decorate;
+        private readonly Queue<(HttpStatusCode Status, string Body, Action<HttpResponseMessage>? Decorate)> _responses;
+        
+        public List<HttpRequestMessage> Requests { get; } = new();
+        public List<string?> Bodies { get; } = new();
 
-        public HttpRequestMessage? LastRequest { get; private set; }
-        public string? LastBody { get; private set; }
+        public HttpRequestMessage? LastRequest => Requests.LastOrDefault();
+        public string? LastBody => Bodies.LastOrDefault();
 
         public StubHandler(HttpStatusCode status, string body, Action<HttpResponseMessage>? decorate = null)
         {
-            _status = status;
-            _body = body;
-            _decorate = decorate;
+            _responses = new Queue<(HttpStatusCode, string, Action<HttpResponseMessage>?)>();
+            _responses.Enqueue((status, body, decorate));
+        }
+
+        public StubHandler(IEnumerable<(HttpStatusCode Status, string Body, Action<HttpResponseMessage>? Decorate)> responses)
+        {
+            _responses = new Queue<(HttpStatusCode, string, Action<HttpResponseMessage>?)>(responses);
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            LastRequest = request;
-            LastBody = request.Content == null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            Requests.Add(request);
+            Bodies.Add(request.Content == null ? null : await request.Content.ReadAsStringAsync(cancellationToken));
 
-            var response = new HttpResponseMessage(_status)
+            var (status, body, decorate) = _responses.Count > 1 ? _responses.Dequeue() : _responses.Peek();
+
+            var response = new HttpResponseMessage(status)
             {
-                Content = new StringContent(_body, Encoding.UTF8, "application/json")
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
             };
-            _decorate?.Invoke(response);
+            decorate?.Invoke(response);
             return response;
         }
     }
@@ -148,7 +155,7 @@ public class JiraClientTests
         var (client, _) = ClientFor(HttpStatusCode.TooManyRequests, "{}",
             response => response.Headers.Add("Retry-After", "30"));
 
-        var error = await Assert.ThrowsAsync<JiraException>(() => client.SearchAsync("x"));
+        var error = await Assert.ThrowsAsync<JiraException>(() => client.MyselfAsync());
 
         Assert.Equal(JiraFailure.RateLimited, error.Failure);
         Assert.Equal(TimeSpan.FromSeconds(30), error.RetryAfter);
@@ -387,5 +394,79 @@ public class JiraClientTests
         var client = new JiraClient(Credentials);
 
         Assert.Equal("https://acme.atlassian.net/browse/SWEB-6832", client.BrowseUrl("SWEB-6832").AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task SearchAsync_HandlesPaginationAnd429WaitLogic()
+    {
+        var responses = new (HttpStatusCode Status, string Body, Action<HttpResponseMessage>? Decorate)[]
+        {
+            (HttpStatusCode.OK, """{"total": 3, "issues": [{"key": "A-1"}]}""", null),
+            (HttpStatusCode.TooManyRequests, "{}", response => response.Headers.Add("Retry-After", "1")),
+            (HttpStatusCode.OK, """{"total": 3, "issues": [{"key": "A-2"}, {"key": "A-3"}]}""", null)
+        };
+
+        var handler = new StubHandler(responses);
+        var client = new JiraClient(Credentials, new HttpClient(handler));
+
+        var issues = await client.SearchAsync("project = A", 3);
+
+        Assert.Equal(3, issues.Count);
+        Assert.Equal("A-1", issues[0].Key);
+        Assert.Equal("A-2", issues[1].Key);
+        Assert.Equal("A-3", issues[2].Key);
+
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.DoesNotContain("\"startAt\"", handler.Bodies[0]);
+        Assert.Contains("\"startAt\":1", handler.Bodies[1]);
+        Assert.Contains("\"startAt\":1", handler.Bodies[2]);
+    }
+
+    [Fact]
+    public async Task GetCreateFieldsAsync_CallsCreatemetaEndpoint()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.OK, """
+        {
+          "values": [
+            { "fieldId": "summary", "name": "Summary", "required": true, "schema": { "type": "string" } },
+            { "fieldId": "description", "name": "Description", "required": false, "schema": { "type": "string" } }
+          ]
+        }
+        """);
+
+        var fields = await client.GetCreateFieldsAsync("PROJ", "10001");
+
+        Assert.Equal(2, fields.Count);
+        Assert.Equal("summary", fields[0].Key);
+        Assert.True(fields[0].Required);
+        Assert.False(fields[1].Required);
+
+        Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/createmeta/PROJ/issuetypes/10001", handler.LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task UpdateIssueAsync_SendsFieldsToIssueEndpoint()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.UpdateIssueAsync("PROJ-123", new JiraIssueUpdateParameters { Summary = "New Summary" });
+
+        Assert.Equal(HttpMethod.Put, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/PROJ-123", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"summary\":\"New Summary\"", handler.LastBody);
+    }
+
+    [Fact]
+    public async Task TransitionAsync_WithFields_SendsFieldsInRequest()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.TransitionAsync("PROJ-123", "31", new JiraIssueUpdateParameters { Summary = "Updated during transition" });
+
+        Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/PROJ-123/transitions", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"id\":\"31\"", handler.LastBody);
+        Assert.Contains("\"summary\":\"Updated during transition\"", handler.LastBody);
     }
 }

@@ -287,14 +287,44 @@ public sealed partial class KanbanBoardPage : Page
         try
         {
             var transitions = await ViewModel.TransitionsForAsync(issue);
-            var transition = transitions.FirstOrDefault(t => t.ToStatus == targetColumn.Status);
-            if (transition == null)
+            var validTransitions = transitions.Where(t => t.ToStatus == targetColumn.Status).ToList();
+            
+            if (validTransitions.Count == 0)
             {
                 ViewModel.ReportFailure(issue.Key, $"{issue.Key} can't move from {issue.Status} to {targetColumn.Status} in its workflow.");
                 return;
             }
 
-            await ViewModel.MoveIssueAsync(issue, transition);
+            if (validTransitions.Count == 1)
+            {
+                await ViewModel.MoveIssueAsync(issue, validTransitions[0]);
+            }
+            else
+            {
+                var panel = new StackPanel { Spacing = 8 };
+                panel.Children.Add(new TextBlock { Text = $"There are multiple ways to move {issue.Key} to {targetColumn.Status}. Please choose one:", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) });
+                
+                var dialog = new ContentDialog
+                {
+                    Title = "Choose Transition",
+                    Content = panel,
+                    CloseButtonText = "Cancel",
+                    XamlRoot = this.XamlRoot
+                };
+
+                foreach (var t in validTransitions)
+                {
+                    var btn = new Button { Content = t.Name, HorizontalAlignment = HorizontalAlignment.Stretch };
+                    btn.Click += (_, _) =>
+                    {
+                        dialog.Hide();
+                        _ = ViewModel.MoveIssueAsync(issue, t);
+                    };
+                    panel.Children.Add(btn);
+                }
+
+                await dialog.ShowAsync();
+            }
         }
         catch (Exception ex)
         {

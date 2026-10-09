@@ -60,19 +60,39 @@ public sealed class JiraClient
 
     public async Task<IReadOnlyList<JiraIssue>> SearchAsync(string jql, int limit = 50, CancellationToken cancellationToken = default)
     {
-        var request = Request(HttpMethod.Post, SearchPath);
-        SetJsonBody(request, new JiraSearchRequest { Jql = jql, Fields = CardFields, MaxResults = limit },
-                    JiraJsonContext.Default.JiraSearchRequest);
+        var issues = new List<JiraIssue>();
+        var startAt = 0;
 
-        var body = await SendAsync(request, cancellationToken);
-
-        var response = Deserialize(body, JiraJsonContext.Default.JiraSearchResponse);
-        if (response?.Issues == null) throw JiraException.Malformed();
-
-        var issues = new List<JiraIssue>(response.Issues.Count);
-        foreach (var raw in response.Issues)
+        while (issues.Count < limit)
         {
-            if (ToIssue(raw) is { } issue) issues.Add(issue);
+            var request = Request(HttpMethod.Post, SearchPath);
+            SetJsonBody(request, new JiraSearchRequest { Jql = jql, Fields = CardFields, MaxResults = limit - issues.Count, StartAt = startAt },
+                        JiraJsonContext.Default.JiraSearchRequest);
+
+            string body;
+            try
+            {
+                body = await SendAsync(request, cancellationToken);
+            }
+            catch (JiraException ex) when (ex.Failure == JiraFailure.RateLimited)
+            {
+                var delay = ex.RetryAfter ?? TimeSpan.FromSeconds(5);
+                await Task.Delay(delay, cancellationToken);
+                continue;
+            }
+
+            var response = Deserialize(body, JiraJsonContext.Default.JiraSearchResponse);
+            if (response?.Issues == null) throw JiraException.Malformed();
+
+            var batch = response.Issues;
+            foreach (var raw in batch)
+            {
+                if (ToIssue(raw) is { } issue) issues.Add(issue);
+            }
+
+            if (batch.Count == 0 || response.Total <= issues.Count) break;
+            
+            startAt += batch.Count;
         }
 
         return issues;

@@ -13,10 +13,14 @@ internal sealed class JiraSearchRequest
     public string Jql { get; set; } = string.Empty;
     public string[] Fields { get; set; } = Array.Empty<string>();
     public int MaxResults { get; set; }
+    
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int StartAt { get; set; }
 }
 
 internal sealed class JiraSearchResponse
 {
+    public int Total { get; set; }
     public List<JiraIssueDto>? Issues { get; set; }
 }
 
@@ -141,12 +145,16 @@ internal sealed class JiraCreateIssueRequest
 /// </summary>
 internal sealed class JiraCreateIssueFieldsDto
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JiraProjectDto? Project { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Summary { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Description { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("issuetype")]
     public JiraRefDto? IssueType { get; set; }
 

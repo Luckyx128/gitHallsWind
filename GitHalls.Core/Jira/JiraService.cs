@@ -45,4 +45,39 @@ public class JiraService : IJiraService
     {
         return new JiraClient(credentials).UpdateIssueAsync(key, parameters, cancellationToken);
     }
+
+    public Task<IReadOnlyList<JiraProject>> GetProjectsAsync(JiraCredentials credentials, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).GetProjectsAsync(cancellationToken);
+    }
+
+    public Task<IReadOnlyList<JiraIssueType>> GetIssueTypesAsync(JiraCredentials credentials, string projectKey, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).GetIssueTypesAsync(projectKey, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<JiraCreateField>> GetCreateFieldsAsync(JiraCredentials credentials, string projectKey, string issueTypeId, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).GetCreateFieldsAsync(projectKey, issueTypeId, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<JiraFieldOption>> FindTeamsAsync(JiraCredentials credentials, string query, string? autoCompleteUrl = null, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).FindTeamsAsync(query, autoCompleteUrl, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<JiraSprint>> GetOpenSprintsAsync(JiraCredentials credentials, string projectKey, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).GetOpenSprintsAsync(projectKey, cancellationToken);
+    }
+
+    public Task MoveToSprintAsync(JiraCredentials credentials, int sprintId, IEnumerable<string> keys, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).MoveToSprintAsync(sprintId, keys, cancellationToken);
+    }
+
+    public Uri BrowseUrl(JiraCredentials credentials, string key)
+    {
+        return new JiraClient(credentials).BrowseUrl(key);
+    }
 }

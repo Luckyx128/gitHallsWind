@@ -487,6 +487,10 @@ public partial class JiraViewModel : ObservableObject
         // publishing the local patch: a search that lands meanwhile is the
         // newer truth, and this update must not be laid back over it.
         var token = _searchToken;
+        var oldIssue = FindIssue(issue.Key);
+
+        // Optimistic update
+        if (_searchToken == token) ReplaceIssue(issue.Key, apply);
 
         try
         {
@@ -494,13 +498,13 @@ public partial class JiraViewModel : ObservableObject
 
             _transitions.Remove(issue.Key);
 
-            if (_searchToken == token) ReplaceIssue(issue.Key, apply);
-
             ReportAction(issue.Key, confirmation, failed: false);
             return true;
         }
         catch (Exception ex)
         {
+            // Revert on failure
+            if (_searchToken == token && oldIssue != null) ReplaceIssue(issue.Key, _ => oldIssue);
             ReportAction(issue.Key, ex.Message, failed: true);
             return false;
         }

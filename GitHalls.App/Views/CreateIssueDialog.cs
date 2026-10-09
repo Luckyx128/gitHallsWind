@@ -250,7 +250,7 @@ internal sealed class CreateIssueDialog
                 var box = new AutoSuggestBox { Header = header, PlaceholderText = "Type to search teams" };
                 box.TextChanged += async (sender, args) =>
                 {
-                    if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInputChange) return;
+                    if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
                     if (chosen != null && sender.Text != chosen.Label) chosen = null;
 
                     var query = sender.Text;
