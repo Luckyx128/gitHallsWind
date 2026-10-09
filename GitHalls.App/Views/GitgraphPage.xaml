@@ -67,6 +67,16 @@
                             </ItemsControl>
 
                             <TextBlock Text="{x:Bind Commit.Summary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <Border Visibility="{x:Bind Commit.IsPendingPush, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                    CornerRadius="4" Padding="4,1"
+                                    VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="Unpushed commit">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE898;" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="Unpushed" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </StackPanel>
+                            </Border>
                             <TextBlock Text="{x:Bind Commit.AuthorName}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
                             <TextBlock Text="{x:Bind Commit.RelativeDate}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="12" />
                         </StackPanel>

@@ -267,4 +267,14 @@
         <Setter Property="Padding" Value="10,2" />
     </Style>
 
+    <!-- Edge-to-edge variant for git history to keep the graph tracks continuous without gaps. -->
+    <Style x:Key="GHHistoryListItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource GHListItemStyle}">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+
 </ResourceDictionary>

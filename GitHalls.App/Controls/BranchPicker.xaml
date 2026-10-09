@@ -44,7 +44,7 @@
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="8,0,0,0">
                             <FontIcon Glyph="{x:Bind PendingPushGlyph}" FontSize="12"
                                       Visibility="{x:Bind PendingPushVisibility}"
-                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                      Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                       ToolTipService.ToolTip="{x:Bind PendingPushToolTip}" />
                             <FontIcon Glyph="&#xE73E;" FontSize="12"
                                       Visibility="{x:Bind CheckVisibility}"

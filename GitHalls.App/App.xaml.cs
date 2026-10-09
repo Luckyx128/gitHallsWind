@@ -34,6 +34,14 @@ namespace GitHalls.App
         /// </summary>
         public App()
         {
+            UnhandledException += (s, e) =>
+            {
+                try
+                {
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "GitHalls_crash.txt"), e.Exception?.ToString() ?? e.Message);
+                }
+                catch { }
+            };
             InitializeComponent();
         }
 

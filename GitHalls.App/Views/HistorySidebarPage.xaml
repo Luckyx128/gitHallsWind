@@ -43,22 +43,23 @@
                   SelectionMode="Single"
                   ShowsScrollingPlaceholders="False"
                   Style="{StaticResource GHListViewStyle}"
-                  ItemContainerStyle="{StaticResource GHListItemStyle}">
+                  ItemContainerStyle="{StaticResource GHHistoryListItemStyle}">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="graph:GraphRow">
-                    <Grid MinHeight="36" Padding="0,2">
+                    <Grid MinHeight="40" Padding="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <controls:GraphRowCanvas RowData="{x:Bind}" Grid.Column="0" Margin="0,0,8,0" />
+                        <controls:GraphRowCanvas RowData="{x:Bind}" Grid.Column="0" VerticalAlignment="Stretch" Margin="0,0,8,0" />
 
-                        <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2" VerticalAlignment="Center" Padding="0,6">
                             <Grid ColumnSpacing="6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <ItemsControl Grid.Column="0" ItemsSource="{x:Bind Commit.Refs}">
@@ -80,6 +81,19 @@
                                 <TextBlock Grid.Column="1" Text="{x:Bind Commit.Summary}" FontWeight="SemiBold"
                                            TextTrimming="CharacterEllipsis" MaxLines="1"
                                            ToolTipService.ToolTip="{x:Bind Commit.Message}" />
+
+                                <Border Grid.Column="2"
+                                        Visibility="{x:Bind Commit.IsPendingPush, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="4" Padding="5,2" Margin="4,0,4,0"
+                                        VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Unpushed commit">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE898;" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="Unpushed" FontSize="10" FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    </StackPanel>
+                                </Border>
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Spacing="6">

@@ -66,6 +66,7 @@ public sealed class GraphRowCanvas : Canvas
         if (row == null) return;
 
         double currentHeight = ActualHeight > 0 ? ActualHeight : RowHeight;
+        const double overlap = 0.5;
 
         // Draw top lines
         foreach (var track in row.TopTracks)
@@ -73,11 +74,13 @@ public sealed class GraphRowCanvas : Canvas
             var line = new Line
             {
                 X1 = track.Index * TrackWidth + (TrackWidth / 2),
-                Y1 = 0,
+                Y1 = -overlap,
                 X2 = track.Index * TrackWidth + (TrackWidth / 2),
-                Y2 = track.Index == row.TrackIndex ? currentHeight / 2 : currentHeight,
+                Y2 = track.Index == row.TrackIndex ? currentHeight / 2 : currentHeight + overlap,
                 Stroke = GetBrush(track.ColorIndex),
-                StrokeThickness = LineThickness
+                StrokeThickness = LineThickness,
+                StrokeStartLineCap = PenLineCap.Flat,
+                StrokeEndLineCap = PenLineCap.Flat
             };
             Children.Add(line);
         }
@@ -88,7 +91,7 @@ public sealed class GraphRowCanvas : Canvas
             var startX = edge.StartTrack * TrackWidth + (TrackWidth / 2);
             var endX = edge.EndTrack * TrackWidth + (TrackWidth / 2);
             var startY = currentHeight / 2;
-            var endY = currentHeight;
+            var endY = currentHeight + overlap;
 
             if (edge.StartTrack == edge.EndTrack)
             {
@@ -97,7 +100,9 @@ public sealed class GraphRowCanvas : Canvas
                     var line = new Line
                     {
                         X1 = startX, Y1 = startY, X2 = endX, Y2 = endY,
-                        Stroke = GetBrush(edge.ColorIndex), StrokeThickness = LineThickness
+                        Stroke = GetBrush(edge.ColorIndex), StrokeThickness = LineThickness,
+                        StrokeStartLineCap = PenLineCap.Flat,
+                        StrokeEndLineCap = PenLineCap.Flat
                     };
                     Children.Add(line);
                 }
@@ -108,7 +113,9 @@ public sealed class GraphRowCanvas : Canvas
                 var path = new Microsoft.UI.Xaml.Shapes.Path
                 {
                     Stroke = GetBrush(edge.ColorIndex),
-                    StrokeThickness = LineThickness
+                    StrokeThickness = LineThickness,
+                    StrokeStartLineCap = PenLineCap.Flat,
+                    StrokeEndLineCap = PenLineCap.Flat
                 };
 
                 var geometry = new PathGeometry();
