@@ -13,6 +13,55 @@ namespace GitHalls.Core.Jira;
 /// </summary>
 public static class JiraAdf
 {
+    /// <summary>
+    /// The other direction, for writes: v3 refuses a plain string where a
+    /// rich-text field is expected. A blank line starts a paragraph; a single
+    /// line break stays a line break inside it.
+    /// </summary>
+    public static JsonElement FromPlainText(string text) => JiraCreateFieldValue.Write(writer =>
+    {
+        writer.WriteStartObject();
+        writer.WriteString("type", "doc");
+        writer.WriteNumber("version", 1);
+        writer.WriteStartArray("content");
+
+        var paragraphs = text.Replace("\r\n", "\n").Split("\n\n")
+            .Select(paragraph => paragraph.Trim('\n'))
+            .Where(paragraph => paragraph.Trim().Length > 0);
+
+        foreach (var paragraph in paragraphs)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("type", "paragraph");
+            writer.WriteStartArray("content");
+
+            var lines = paragraph.Split('\n');
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (i > 0)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("type", "hardBreak");
+                    writer.WriteEndObject();
+                }
+
+                // An empty text node is invalid ADF; a blank line inside a
+                // paragraph is only its break.
+                if (lines[i].Length == 0) continue;
+                writer.WriteStartObject();
+                writer.WriteString("type", "text");
+                writer.WriteString("text", lines[i]);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+    });
+
     public static string ToPlainText(JsonElement? document)
     {
         if (document is not { ValueKind: JsonValueKind.Object } root) return string.Empty;

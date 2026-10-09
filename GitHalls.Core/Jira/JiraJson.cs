@@ -134,24 +134,62 @@ internal sealed class JiraCreateIssueRequest
     public JiraCreateIssueFieldsDto? Fields { get; set; }
 }
 
+/// <summary>
+/// Every optional field is left out when unset rather than written as null:
+/// Jira refuses a field that is not on the project's create screen even when
+/// its value is null ("Field 'priority' cannot be set").
+/// </summary>
 internal sealed class JiraCreateIssueFieldsDto
 {
     public JiraProjectDto? Project { get; set; }
     public string? Summary { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Description { get; set; }
 
     [JsonPropertyName("issuetype")]
-    public JiraNamedDto? IssueType { get; set; }
+    public JiraRefDto? IssueType { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JiraNamedDto? Priority { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Labels { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JiraUserDto? Assignee { get; set; }
+
+    /// <summary>
+    /// The required fields createmeta asked for beyond the ones above — Team,
+    /// time tracking, custom fields — each already in the shape Jira wants,
+    /// written beside the named ones under their own field ids.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 internal sealed class JiraProjectDto
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Key { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Id { get; set; }
+}
+
+/// <summary>A reference by id or by name, whichever is known; the other is left out.</summary>
+internal sealed class JiraRefDto
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Name { get; set; }
+}
+
+internal sealed class JiraMoveToSprintRequest
+{
+    public List<string> Issues { get; set; } = new();
 }
 
 internal sealed class JiraCreateIssueResponse
@@ -200,6 +238,7 @@ internal sealed class JiraUpdateIssueFieldsDto
 [JsonSerializable(typeof(JiraCreateIssueRequest))]
 [JsonSerializable(typeof(JiraCreateIssueResponse))]
 [JsonSerializable(typeof(JiraUpdateIssueRequest))]
+[JsonSerializable(typeof(JiraMoveToSprintRequest))]
 internal partial class JiraJsonContext : JsonSerializerContext
 {
 }

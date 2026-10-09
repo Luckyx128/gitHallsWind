@@ -18,6 +18,8 @@ public sealed class JiraClient
     private const string SearchPath = "/rest/api/3/search/jql";
     private const string MyselfPath = "/rest/api/3/myself";
     private const string IssuePath = "/rest/api/3/issue/";
+    private const string CreateMetaPath = "/rest/api/3/issue/createmeta/";
+    private const string AgilePath = "/rest/agile/1.0";
 
     /// <summary>Only what a card renders; asking for everything costs Jira time it doesn't need to spend.</summary>
     private static readonly string[] CardFields = { "summary", "status", "issuetype", "priority", "updated", "assignee" };
@@ -173,10 +175,13 @@ public sealed class JiraClient
                 Project = new JiraProjectDto { Key = parameters.ProjectKey },
                 Summary = parameters.Summary,
                 Description = parameters.Description,
-                IssueType = new JiraNamedDto { Name = parameters.IssueTypeName },
+                IssueType = parameters.IssueTypeId is { Length: > 0 } typeId
+                    ? new JiraRefDto { Id = typeId }
+                    : new JiraRefDto { Name = parameters.IssueTypeName },
                 Priority = parameters.PriorityName != null ? new JiraNamedDto { Name = parameters.PriorityName } : null,
                 Labels = parameters.Labels?.ToList(),
-                Assignee = parameters.AssigneeAccountId != null ? new JiraUserDto { AccountId = parameters.AssigneeAccountId } : null
+                Assignee = parameters.AssigneeAccountId != null ? new JiraUserDto { AccountId = parameters.AssigneeAccountId } : null,
+                Extra = parameters.ExtraFields is { Count: > 0 } extra ? new Dictionary<string, JsonElement>(extra) : null
             }
         };
 
@@ -211,6 +216,141 @@ public sealed class JiraClient
         await SendAsync(request, cancellationToken);
     }
 
+    // MARK: - What a create form needs
+
+    /// <summary>Projects the user may browse, by name. The first 100: a picker longer than that wants a search box.</summary>
+    public async Task<IReadOnlyList<JiraProject>> GetProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        var body = await SendAsync(Request(HttpMethod.Get, "/rest/api/3/project/search?orderBy=name&maxResults=100"), cancellationToken);
+
+        return Values(body, "values")
+            .Select(raw => (Id: Text(raw, "id"), Key: Text(raw, "key"), Name: Text(raw, "name")))
+            .Where(project => project.Id != null && project.Key != null)
+            .Select(project => new JiraProject(project.Id!, project.Key!, project.Name ?? project.Key!))
+            .ToList();
+    }
+
+    /// <summary>What can be created in the project, subtask types included and flagged.</summary>
+    public async Task<IReadOnlyList<JiraIssueType>> GetIssueTypesAsync(string projectKey, CancellationToken cancellationToken = default)
+    {
+        var path = CreateMetaPath + Uri.EscapeDataString(projectKey) + "/issuetypes?maxResults=100";
+        var body = await SendAsync(Request(HttpMethod.Get, path), cancellationToken);
+
+        // Cloud answers `issueTypes`; the paged shape of newer docs says `values`.
+        return Values(body, "issueTypes", "values")
+            .Select(raw => (Id: Text(raw, "id"), Name: Text(raw, "name"),
+                            Subtask: raw.TryGetProperty("subtask", out var flag) && flag.ValueKind == JsonValueKind.True))
+            .Where(type => type.Id != null)
+            .Select(type => new JiraIssueType(type.Id!, type.Name ?? type.Id!, type.Subtask))
+            .ToList();
+    }
+
+    /// <summary>The fields of the create screen for this project and type, required ones flagged.</summary>
+    public async Task<IReadOnlyList<JiraCreateField>> GetCreateFieldsAsync(string projectKey, string issueTypeId,
+                                                                           CancellationToken cancellationToken = default)
+    {
+        var path = CreateMetaPath + Uri.EscapeDataString(projectKey) + "/issuetypes/" + Uri.EscapeDataString(issueTypeId) + "?maxResults=200";
+        var body = await SendAsync(Request(HttpMethod.Get, path), cancellationToken);
+
+        return Values(body, "fields", "values")
+            .Select(JiraCreateField.Parse)
+            .OfType<JiraCreateField>()
+            .ToList();
+    }
+
+    /// <summary>
+    /// Teams matching <paramref name="query"/>, for the Team field. Jira says
+    /// where to search in the field's own createmeta entry; the fallback is the
+    /// path Jira's own picker has used, not part of the public reference. The
+    /// URL must be on the Jira site: it is sent the credentials.
+    /// </summary>
+    public async Task<IReadOnlyList<JiraFieldOption>> FindTeamsAsync(string query, string? autoCompleteUrl = null,
+                                                                     CancellationToken cancellationToken = default)
+    {
+        var text = query.Trim();
+        HttpRequestMessage request;
+
+        if (autoCompleteUrl is { Length: > 0 })
+        {
+            var url = SuggestionUrl(autoCompleteUrl, text);
+            if (url == null || !string.Equals(url.Host, _credentials.Site.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                throw JiraException.Malformed();
+            }
+            request = Request(HttpMethod.Get, url);
+        }
+        else
+        {
+            request = Request(HttpMethod.Get, "/rest/teams/1.0/teams/find?query=" + Uri.EscapeDataString(text));
+        }
+
+        var body = await SendAsync(request, cancellationToken);
+        return Values(body, "teams", "results", "values", "suggestions", "items")
+            .Select(JiraCreateField.ParseOption)
+            .OfType<JiraFieldOption>()
+            .ToList();
+    }
+
+    /// <summary>The autocomplete URL with the query filled in: many end in <c>query=</c>.</summary>
+    public static Uri? SuggestionUrl(string template, string query)
+    {
+        var encoded = Uri.EscapeDataString(query);
+        if (template.EndsWith('=')) return Uri.TryCreate(template + encoded, UriKind.Absolute, out var direct) ? direct : null;
+
+        var joiner = template.Contains('?') ? "&" : "?";
+        return Uri.TryCreate(template + joiner + "query=" + encoded, UriKind.Absolute, out var url) ? url : null;
+    }
+
+    // MARK: - Sprints
+
+    /// <summary>
+    /// Active and future sprints of the project's scrum boards, active first.
+    /// An issue created through the API lands in the backlog; these are where
+    /// it can go instead. A board the user cannot read must not hide the others.
+    /// </summary>
+    public async Task<IReadOnlyList<JiraSprint>> GetOpenSprintsAsync(string projectKey, CancellationToken cancellationToken = default)
+    {
+        var boards = await SendAsync(Request(HttpMethod.Get, AgilePath + "/board?projectKeyOrId=" + Uri.EscapeDataString(projectKey)),
+                                     cancellationToken);
+
+        var sprints = new List<JiraSprint>();
+        foreach (var board in Values(boards, "values"))
+        {
+            // A kanban board has no sprints and answers 400 when asked.
+            if (Text(board, "type") != "scrum" || !board.TryGetProperty("id", out var id) || !id.TryGetInt32(out var boardId)) continue;
+
+            string body;
+            try
+            {
+                body = await SendAsync(Request(HttpMethod.Get, AgilePath + $"/board/{boardId}/sprint?state=active,future"), cancellationToken);
+            }
+            catch (JiraException)
+            {
+                continue;
+            }
+
+            foreach (var raw in Values(body, "values"))
+            {
+                if (!raw.TryGetProperty("id", out var sprintId) || !sprintId.TryGetInt32(out var number)) continue;
+                sprints.Add(new JiraSprint(number, Text(raw, "name") ?? $"Sprint {number}", Text(raw, "state") ?? "future")
+                {
+                    StartDate = DateTimeOffset.TryParse(Text(raw, "startDate"), out var start) ? start : null
+                });
+            }
+        }
+
+        return JiraSprintChoice.Ordered(sprints);
+    }
+
+    /// <summary>Files the issues in the sprint. 204, no body.</summary>
+    public async Task MoveToSprintAsync(int sprintId, IEnumerable<string> keys, CancellationToken cancellationToken = default)
+    {
+        var request = Request(HttpMethod.Post, AgilePath + $"/sprint/{sprintId}/issue");
+        SetJsonBody(request, new JiraMoveToSprintRequest { Issues = keys.ToList() }, JiraJsonContext.Default.JiraMoveToSprintRequest);
+
+        await SendAsync(request, cancellationToken);
+    }
+
     /// <summary>Where a human opens this issue.</summary>
     public Uri BrowseUrl(string key) => new(SiteRoot + "/browse/" + Uri.EscapeDataString(key));
 
@@ -220,15 +360,61 @@ public sealed class JiraClient
 
     private static string TransitionsPath(string key) => IssuePath + Uri.EscapeDataString(key) + "/transitions";
 
-    private HttpRequestMessage Request(HttpMethod method, string path)
-    {
+    private HttpRequestMessage Request(HttpMethod method, string path) =>
         // Concatenated rather than composed with Uri: a site given with a path
         // ("https://host/jira") keeps it, which relative composition would drop.
-        var request = new HttpRequestMessage(method, SiteRoot + path);
+        Request(method, new Uri(SiteRoot + path));
+
+    private HttpRequestMessage Request(HttpMethod method, Uri url)
+    {
+        var request = new HttpRequestMessage(method, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", _credentials.AuthorizationHeader);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return request;
     }
+
+    /// <summary>
+    /// The list in a body that is either an array itself or wraps one under the
+    /// first of <paramref name="keys"/> present. Read through JsonDocument rather
+    /// than typed DTOs: these shapes vary by endpoint and Jira version, and
+    /// JsonDocument needs no reflection, so trimming leaves it intact.
+    /// </summary>
+    private static IReadOnlyList<JsonElement> Values(string body, params string[] keys)
+    {
+        if (string.IsNullOrWhiteSpace(body)) throw JiraException.Malformed();
+
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            throw JiraException.Malformed();
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+            var list = root.ValueKind == JsonValueKind.Array
+                ? root
+                : keys.Select(key => root.TryGetProperty(key, out var value) ? value : default)
+                      .FirstOrDefault(value => value.ValueKind == JsonValueKind.Array);
+
+            if (list.ValueKind != JsonValueKind.Array) throw JiraException.Malformed();
+            return list.EnumerateArray().Select(element => element.Clone()).ToList();
+        }
+    }
+
+    private static string? Text(JsonElement raw, string name) =>
+        raw.ValueKind == JsonValueKind.Object && raw.TryGetProperty(name, out var value)
+            ? value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString(),
+                JsonValueKind.Number => value.GetRawText(),
+                _ => null
+            }
+            : null;
 
     /// <summary>The body's media type lives here rather than at each call site, which is what Jira rejects a request for missing.</summary>
     private static void SetJsonBody<T>(HttpRequestMessage request, T payload, JsonTypeInfo<T> typeInfo)
