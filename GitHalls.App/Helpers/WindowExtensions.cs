@@ -13,5 +13,11 @@ public static class WindowExtensions
         var titleBar = window.AppWindow.TitleBar;
         titleBar.ButtonBackgroundColor = Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+
+        var iconPath = System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "GitHalls.ico");
+        if (System.IO.File.Exists(iconPath))
+        {
+            window.AppWindow.SetIcon(iconPath);
+        }
     }
 }
