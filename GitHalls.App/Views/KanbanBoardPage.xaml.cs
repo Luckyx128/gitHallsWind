@@ -281,11 +281,24 @@ public sealed partial class KanbanBoardPage : Page
 
         if (issue.Status == targetColumn.Status) return;
 
-        var transitions = await ViewModel.TransitionsForAsync(issue);
-        var transition = transitions.FirstOrDefault(t => t.ToStatus == targetColumn.Status);
-        if (transition != null)
+        // async void: an exception that leaves this method has nowhere to go
+        // but the app's unhandled-exception handler, so a dropped network
+        // during the drop would take the app down. It goes to the banner.
+        try
         {
-            _ = ViewModel.MoveIssueAsync(issue, transition);
+            var transitions = await ViewModel.TransitionsForAsync(issue);
+            var transition = transitions.FirstOrDefault(t => t.ToStatus == targetColumn.Status);
+            if (transition == null)
+            {
+                ViewModel.ReportFailure(issue.Key, $"{issue.Key} can't move from {issue.Status} to {targetColumn.Status} in its workflow.");
+                return;
+            }
+
+            await ViewModel.MoveIssueAsync(issue, transition);
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ReportFailure(issue.Key, ex.Message);
         }
     }
 
