@@ -363,7 +363,7 @@ public partial class JiraViewModel : ObservableObject
     /// <summary>Moves the issue, and moves the card to match. False when Jira refused.</summary>
     public Task<bool> MoveIssueAsync(JiraIssue issue, JiraTransition transition) =>
         WriteAsync(issue,
-            (client, token) => client.TransitionAsync(issue.Key, transition.Id, token),
+            (client, token) => client.TransitionAsync(issue.Key, transition.Id, cancellationToken: token),
             current => current with { Status = transition.ToStatus, StatusCategory = transition.ToStatusCategory },
             $"{issue.Key} moved to {transition.ToStatus}.");
 
@@ -373,6 +373,28 @@ public partial class JiraViewModel : ObservableObject
             (client, token) => client.AssignAsync(issue.Key, accountId, token),
             current => current with { AssigneeAccountId = accountId, AssigneeName = accountId == null ? null : displayName },
             accountId == null ? $"{issue.Key} unassigned." : $"{issue.Key} assigned to {displayName}.");
+
+    public async Task<bool> CreateIssueAsync(JiraIssueCreateParameters parameters)
+    {
+        try
+        {
+            var key = await new JiraClient(RequireCredentials()).CreateIssueAsync(parameters, CancellationToken.None);
+            ReportAction(key, $"{key} created.", failed: false);
+            _ = RefreshAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ReportAction("New issue", ex.Message, failed: true);
+            return false;
+        }
+    }
+
+    public Task<bool> UpdateIssueAsync(JiraIssue issue, JiraIssueUpdateParameters parameters) =>
+        WriteAsync(issue,
+            (client, token) => client.UpdateIssueAsync(issue.Key, parameters, token),
+            current => current with { Summary = parameters.Summary ?? current.Summary },
+            $"{issue.Key} updated.");
 
     /// <summary>
     /// The Jira half of starting work: assign it to yourself, then move it into
