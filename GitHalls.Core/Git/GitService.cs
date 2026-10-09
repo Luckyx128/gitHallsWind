@@ -133,6 +133,59 @@ public class GitService
         return null;
     }
 
+    /// <summary>
+    /// Returns the set of commit hashes that have not been pushed to any remote
+    /// or are ahead of the tracking upstream branch.
+    /// </summary>
+    public async Task<HashSet<string>> GetUnpushedCommitHashesAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var result = await _runner.RunAsync(
+                repoPath,
+                new[] { "rev-list", "--branches", "--not", "--remotes" },
+                cancellationToken: cancellationToken);
+
+            foreach (var line in result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    hashes.Add(trimmed);
+                }
+            }
+        }
+        catch (GitException)
+        {
+            // Allowed if no remotes or git command fails
+        }
+
+        try
+        {
+            var aheadResult = await _runner.RunAsync(
+                repoPath,
+                new[] { "rev-list", "@{u}..HEAD" },
+                cancellationToken: cancellationToken);
+
+            foreach (var line in aheadResult.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    hashes.Add(trimmed);
+                }
+            }
+        }
+        catch (GitException)
+        {
+            // Normal when HEAD has no upstream or is detached
+        }
+
+        return hashes;
+    }
+
     /// <summary>What <see cref="CommitLogParser"/> reads back — the two must change together.</summary>
     private const string LogFormat = "%H%n%an%n%ae%n%aI%n%B%n---COMMIT_END---";
 
@@ -143,7 +196,21 @@ public class GitService
         try
         {
             var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
-            return _logParser.Parse(result.StandardOutput);
+            var commits = _logParser.Parse(result.StandardOutput);
+
+            var unpushed = await GetUnpushedCommitHashesAsync(repoPath, cancellationToken);
+            if (unpushed.Count > 0)
+            {
+                foreach (var c in commits)
+                {
+                    if (unpushed.Contains(c.Hash))
+                    {
+                        c.IsPendingPush = true;
+                    }
+                }
+            }
+
+            return commits;
         }
         catch (GitException)
         {
@@ -168,7 +235,21 @@ public class GitService
         try
         {
             var result = await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
-            return _graphLogParser.Parse(result.StandardOutput);
+            var commits = _graphLogParser.Parse(result.StandardOutput);
+
+            var unpushed = await GetUnpushedCommitHashesAsync(repoPath, cancellationToken);
+            if (unpushed.Count > 0)
+            {
+                foreach (var c in commits)
+                {
+                    if (unpushed.Contains(c.Hash))
+                    {
+                        c.IsPendingPush = true;
+                    }
+                }
+            }
+
+            return commits;
         }
         catch (GitException)
         {

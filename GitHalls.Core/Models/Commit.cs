@@ -10,8 +10,9 @@ public class Commit
     public string Message { get; }
     public IReadOnlyList<string> Parents { get; }
     public IReadOnlyList<string> Refs { get; }
+    public bool IsPendingPush { get; set; }
 
-    public Commit(string hash, string authorName, string authorEmail, DateTimeOffset date, string message, IReadOnlyList<string>? parents = null, IReadOnlyList<string>? refs = null)
+    public Commit(string hash, string authorName, string authorEmail, DateTimeOffset date, string message, IReadOnlyList<string>? parents = null, IReadOnlyList<string>? refs = null, bool isPendingPush = false)
     {
         Hash = hash;
         ShortHash = hash.Length >= 7 ? hash.Substring(0, 7) : hash;
@@ -21,6 +22,7 @@ public class Commit
         Message = message;
         Parents = parents ?? Array.Empty<string>();
         Refs = refs ?? Array.Empty<string>();
+        IsPendingPush = isPendingPush;
     }
 
     /// <summary>First line of the message — what the history list shows.</summary>
