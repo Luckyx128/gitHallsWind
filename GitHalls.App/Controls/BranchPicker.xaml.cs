@@ -27,6 +27,13 @@ public sealed class BranchListItem
     public FontWeight FontWeight => IsHeader || IsCurrent ? FontWeights.SemiBold : FontWeights.Normal;
     public Visibility CheckVisibility => IsCurrent ? Visibility.Visible : Visibility.Collapsed;
 
+    public bool ShowPendingPush => Branch != null && !Branch.IsRemote && Branch.HasPendingPush;
+    public string PendingPushGlyph => Branch?.IsLocalOnly == true ? "\uE898" : "\uE72B";
+    public string PendingPushToolTip => Branch?.IsLocalOnly == true
+        ? "Local branch (unpublished)"
+        : $"Pending push ({Branch?.Ahead} commit{(Branch?.Ahead == 1 ? "" : "s")})";
+    public Visibility PendingPushVisibility => ShowPendingPush ? Visibility.Visible : Visibility.Collapsed;
+
     /// <summary>A Style, not a Brush: see GHBrush on why a captured brush goes
     /// stale when the user switches theme.</summary>
     public Style TitleStyle => (Style)Application.Current.Resources[
