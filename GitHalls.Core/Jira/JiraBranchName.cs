@@ -12,8 +12,18 @@ namespace GitHalls.Core.Jira;
 /// no longer matched. A suggestion, not a rule — the user edits it before
 /// anything is created.
 /// </summary>
-public static class JiraBranchName
+public static partial class JiraBranchName
 {
+    public static string? ExtractKey(string branchName)
+    {
+        if (string.IsNullOrWhiteSpace(branchName)) return null;
+        var match = KeyRegex().Match(branchName);
+        return match.Success ? match.Value.ToUpperInvariant() : null;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"[A-Za-z]+-\d+")]
+    private static partial System.Text.RegularExpressions.Regex KeyRegex();
+
     public static string Suggest(JiraIssue issue) => SuggestFor(issue.Key, issue.Type);
 
     /// <summary>

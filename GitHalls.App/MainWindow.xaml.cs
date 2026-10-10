@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
 
     public RepositoryViewModel ViewModel { get; }
 
+    public System.Collections.ObjectModel.ObservableCollection<object> LinkedIssues { get; } = new();
+
     /// <summary>Jira state, separate from the repository's. They meet only in the issue window.</summary>
     public JiraViewModel JiraViewModel { get; }
 
@@ -390,7 +392,78 @@ public sealed partial class MainWindow : Window
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
         var url = await ViewModel.CreatePullRequestAsync(sheet.Title, sheet.Description, sheet.BaseBranch);
-        if (!string.IsNullOrEmpty(url)) _platformActions.OpenUrl(url);
+        if (!string.IsNullOrEmpty(url)) 
+        {
+            _platformActions.OpenUrl(url);
+            if (sheet.BaseBranch != null && ViewModel.CurrentBranch != null)
+            {
+                await CheckPrFlowRulesAsync(ViewModel.CurrentBranch.Name, sheet.BaseBranch);
+            }
+        }
+    }
+
+    private async Task CheckPrFlowRulesAsync(string localBranch, string destBranch)
+    {
+        var repo = ViewModel.RepositoryPath;
+        if (repo == null) return;
+        
+        if (_settingsStore.Current.PromptedPrRules.TryGetValue(repo, out var branches) &&
+            branches.TryGetValue(localBranch, out var dests) &&
+            dests.Contains(destBranch))
+        {
+            return;
+        }
+
+        var engine = new GitHalls.Core.GitHub.PullRequestRuleEngine(_settingsStore.Current.PullRequestRules);
+        var targetStatus = engine.EvaluateJiraStatus(destBranch);
+        if (string.IsNullOrEmpty(targetStatus)) return;
+        
+        var linkedKeys = ViewModel.GetLinkedIssueKeys(localBranch);
+        if (linkedKeys.Count == 0) return;
+
+        foreach (var key in linkedKeys)
+        {
+            var issue = JiraViewModel.FindIssue(key);
+            if (issue == null || string.Equals(issue.Status, targetStatus, StringComparison.OrdinalIgnoreCase)) continue;
+
+            try 
+            {
+                var transitions = await JiraViewModel.TransitionsForAsync(issue);
+                var transition = transitions?.FirstOrDefault(t => string.Equals(t.ToStatus, targetStatus, StringComparison.OrdinalIgnoreCase));
+                if (transition != null)
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = $"Move {key} to {targetStatus}?",
+                        Content = $"Opening a pull request to {destBranch} usually means {key} should move to {targetStatus}. Do you want to move it now?",
+                        PrimaryButtonText = "Move",
+                        CloseButtonText = "Cancel",
+                        DefaultButton = ContentDialogButton.Primary,
+                        XamlRoot = Content.XamlRoot
+                    };
+                    
+                    if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                    {
+                        await JiraViewModel.MoveIssueAsync(issue, transition);
+                    }
+                }
+            } catch { }
+        }
+
+        await _settingsStore.UpdateAsync(settings =>
+        {
+            if (!settings.PromptedPrRules.TryGetValue(repo, out var repoBranches))
+            {
+                repoBranches = new();
+                settings.PromptedPrRules[repo] = repoBranches;
+            }
+            if (!repoBranches.TryGetValue(localBranch, out var repoDests))
+            {
+                repoDests = new();
+                repoBranches[localBranch] = repoDests;
+            }
+            repoDests.Add(destBranch);
+        });
     }
 
     /// <summary>
@@ -541,6 +614,7 @@ public sealed partial class MainWindow : Window
             case nameof(RepositoryViewModel.CurrentBranch):
                 BranchButtonText.Text = ViewModel.CurrentBranch?.Name ?? "Branch";
                 ToolTipService.SetToolTip(BranchButton, ViewModel.CurrentBranch?.Name ?? "No branch");
+                UpdateLinkedIssues();
                 break;
 
             case nameof(RepositoryViewModel.CurrentDiff):
@@ -589,6 +663,27 @@ public sealed partial class MainWindow : Window
             case nameof(RepositoryViewModel.IsLoadingCommitFileDiff):
                 (ContentFrame.Content as CommitDetailPage)?.Update();
                 break;
+        }
+    }
+
+    private void UpdateLinkedIssues()
+    {
+        LinkedIssues.Clear();
+        var branchName = ViewModel.CurrentBranch?.Name;
+        if (branchName == null) return;
+        
+        var keys = ViewModel.GetLinkedIssueKeys(branchName);
+        foreach (var key in keys)
+        {
+            var issue = JiraViewModel.FindIssue(key);
+            if (issue != null)
+            {
+                LinkedIssues.Add(issue);
+            }
+            else
+            {
+                LinkedIssues.Add(new GitHalls.Core.Jira.JiraIssue(key, "Unknown Summary", "Unknown", "indeterminate", "Task", null, DateTimeOffset.Now));
+            }
         }
     }
 

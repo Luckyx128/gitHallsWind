@@ -21,17 +21,17 @@
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
         </Style>
 
-        <DataTemplate x:Key="JiraIssueCardTemplate" x:DataType="jira:JiraIssue">
+        <DataTemplate x:Key="JiraIssueCardTemplate">
             <Grid Padding="12,10,12,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                   CornerRadius="4" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                  ToolTipService.ToolTip="{x:Bind Summary}">
+                  ToolTipService.ToolTip="{Binding Summary}">
                 <Grid.ContextFlyout>
                     <MenuFlyout Opening="CardMenu_Opening" />
                 </Grid.ContextFlyout>
                 <StackPanel Spacing="6">
-                    <TextBlock Text="{x:Bind Summary}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{x:Bind Key}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
-                    <TextBlock Text="{x:Bind AssigneeName}" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Key}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    <TextBlock Text="{Binding AssigneeName}" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
                 </StackPanel>
             </Grid>
         </DataTemplate>

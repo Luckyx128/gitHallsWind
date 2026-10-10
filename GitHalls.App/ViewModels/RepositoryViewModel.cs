@@ -5,6 +5,7 @@ using GitHalls.Core.Commits;
 using GitHalls.Core.Diff;
 using GitHalls.Core.Git;
 using GitHalls.Core.GitHub;
+using GitHalls.Core.Jira;
 using GitHalls.Core.Markdown;
 using GitHalls.Core.Models;
 using Microsoft.UI.Dispatching;
@@ -1267,6 +1268,74 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         .Distinct(StringComparer.Ordinal)
         .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
         .ToList();
+
+    public IReadOnlyList<string> GetLinkedIssueKeys(string branchName)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (JiraBranchName.ExtractKey(branchName) is { } implicitKey)
+        {
+            keys.Add(implicitKey);
+        }
+
+        if (RepositoryPath != null &&
+            _settingsStore.Current.BranchIssueLinks.TryGetValue(RepositoryPath, out var repoLinks) &&
+            repoLinks.TryGetValue(branchName, out var manualKeys))
+        {
+            foreach (var k in manualKeys) keys.Add(k);
+        }
+
+        return keys.ToList();
+    }
+
+    public void AddLinkedIssue(string branchName, string issueKey)
+    {
+        if (RepositoryPath == null || string.IsNullOrWhiteSpace(issueKey)) return;
+
+        var upperKey = issueKey.Trim().ToUpperInvariant();
+        if (JiraBranchName.ExtractKey(branchName) == upperKey) return; // Already implicitly linked
+
+        _settingsStore.UpdateAsync(settings =>
+        {
+            if (!settings.BranchIssueLinks.TryGetValue(RepositoryPath, out var repoLinks))
+            {
+                repoLinks = new();
+                settings.BranchIssueLinks[RepositoryPath] = repoLinks;
+            }
+
+            if (!repoLinks.TryGetValue(branchName, out var keys))
+            {
+                keys = new();
+                repoLinks[branchName] = keys;
+            }
+
+            if (!keys.Contains(upperKey))
+            {
+                keys.Add(upperKey);
+            }
+        });
+        
+        OnPropertyChanged(nameof(CurrentBranch)); // To trigger UI updates depending on CurrentBranch
+    }
+
+    public void RemoveLinkedIssue(string branchName, string issueKey)
+    {
+        if (RepositoryPath == null || string.IsNullOrWhiteSpace(issueKey)) return;
+        var upperKey = issueKey.Trim().ToUpperInvariant();
+
+        _settingsStore.UpdateAsync(settings =>
+        {
+            if (settings.BranchIssueLinks.TryGetValue(RepositoryPath, out var repoLinks) &&
+                repoLinks.TryGetValue(branchName, out var keys))
+            {
+                keys.Remove(upperKey);
+                if (keys.Count == 0) repoLinks.Remove(branchName);
+                if (repoLinks.Count == 0) settings.BranchIssueLinks.Remove(RepositoryPath);
+            }
+        });
+        
+        OnPropertyChanged(nameof(CurrentBranch));
+    }
 
     /// <summary>
     /// The title and description a new pull request opens with: one commit

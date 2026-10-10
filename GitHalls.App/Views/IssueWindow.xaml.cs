@@ -274,6 +274,51 @@ public sealed partial class IssueWindow : Window
         TargetRepositoryText.Text = hasRepository
             ? $"Will be created in {FolderName(_repository.RepositoryPath!)}, from the branch checked out there now."
             : "Open a repository first — a branch needs somewhere to be created.";
+
+        var linkedBranches = new System.Collections.Generic.List<GitHalls.Core.Models.Branch>();
+        if (hasRepository && _issue != null)
+        {
+            var key = _issue.Key.ToUpperInvariant();
+            foreach (var branch in _repository.Branches)
+            {
+                if (_repository.GetLinkedIssueKeys(branch.Name).Contains(key, System.StringComparer.OrdinalIgnoreCase))
+                {
+                    linkedBranches.Add(branch);
+                }
+            }
+
+            if (LinkToBranchButton != null)
+            {
+                var current = _repository.CurrentBranch;
+                if (current != null)
+                {
+                    LinkToBranchButton.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
+                    var isLinked = _repository.GetLinkedIssueKeys(current.Name).Contains(key, System.StringComparer.OrdinalIgnoreCase);
+                    var isImplicit = GitHalls.Core.Jira.JiraBranchName.ExtractKey(current.Name) == key.ToUpperInvariant();
+                    
+                    if (isImplicit)
+                    {
+                        LinkToBranchButton.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
+                    }
+                    else if (isLinked)
+                    {
+                        LinkToBranchButton.Content = "Unlink from Branch";
+                    }
+                    else
+                    {
+                        LinkToBranchButton.Content = "Link to Branch";
+                    }
+                }
+                else
+                {
+                    LinkToBranchButton.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
+                }
+            }
+        }
+        if (LinkedBranchesList != null)
+        {
+            LinkedBranchesList.ItemsSource = linkedBranches;
+        }
     }
 
     private static string FolderName(string path)
@@ -300,6 +345,32 @@ public sealed partial class IssueWindow : Window
     private void CreateBranch_Click(object sender, RoutedEventArgs e) => CreateBranch();
 
     private void CreateBranch() => _ = _repository.CreateBranchAsync(BranchNameTextBox.Text.Trim());
+
+    private void CheckOutBranch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.Tag is GitHalls.Core.Models.Branch branch)
+        {
+            _ = _repository.CheckoutBranchAsync(branch);
+        }
+    }
+
+    private void LinkToBranch_Click(object sender, RoutedEventArgs e)
+    {
+        var current = _repository.CurrentBranch;
+        if (current == null || _issue == null) return;
+        var key = _issue.Key.ToUpperInvariant();
+        
+        var isLinked = _repository.GetLinkedIssueKeys(current.Name).Contains(key, System.StringComparer.OrdinalIgnoreCase);
+        if (isLinked)
+        {
+            _repository.RemoveLinkedIssue(current.Name, key);
+        }
+        else
+        {
+            _repository.AddLinkedIssue(current.Name, key);
+        }
+        UpdateRepositoryState();
+    }
 
     /// <summary>
     /// Branch, then assign, then move — in that order on purpose. The local

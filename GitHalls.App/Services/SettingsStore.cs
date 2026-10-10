@@ -29,6 +29,14 @@ public class AppSettings
 
     /// <summary>Show diffs side by side rather than unified.</summary>
     public bool SideBySideDiff { get; set; }
+
+    /// <summary>Manual branch-to-issue links, keyed by repository path and then branch name. Each branch can link to multiple Jira keys.</summary>
+    public Dictionary<string, Dictionary<string, List<string>>> BranchIssueLinks { get; set; } = new();
+
+    public List<GitHalls.Core.GitHub.PullRequestRule> PullRequestRules { get; set; } = new();
+
+    /// <summary>Tracks which PR destination branch prompts we've already shown for a given local branch. Keyed by repo path -> local branch -> hashset of destination branches.</summary>
+    public Dictionary<string, Dictionary<string, HashSet<string>>> PromptedPrRules { get; set; } = new();
 }
 
 /// <summary>

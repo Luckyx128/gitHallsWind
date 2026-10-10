@@ -43,4 +43,34 @@ public static class JiraDuration
 
         return number.Length == 0 && total > 0 ? total : null;
     }
+
+    /// <summary>
+    /// Formats a time duration into Jira style (e.g., "1w 2d 3h 30m").
+    /// Assumes 8 hours/day and 5 days/week (40 hours/week).
+    /// </summary>
+    public static string Format(TimeSpan duration)
+    {
+        if (duration.TotalSeconds <= 0) return "0m";
+
+        var totalSeconds = (long)duration.TotalSeconds;
+
+        var weeks = totalSeconds / (5 * 8 * 3600);
+        totalSeconds %= (5 * 8 * 3600);
+
+        var days = totalSeconds / (8 * 3600);
+        totalSeconds %= (8 * 3600);
+
+        var hours = totalSeconds / 3600;
+        totalSeconds %= 3600;
+
+        var minutes = totalSeconds / 60;
+
+        var parts = new System.Collections.Generic.List<string>();
+        if (weeks > 0) parts.Add($"{weeks}w");
+        if (days > 0) parts.Add($"{days}d");
+        if (hours > 0) parts.Add($"{hours}h");
+        if (minutes > 0) parts.Add($"{minutes}m");
+
+        return parts.Count > 0 ? string.Join(" ", parts) : "0m";
+    }
 }

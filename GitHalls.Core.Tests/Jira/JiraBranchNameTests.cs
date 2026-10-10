@@ -9,6 +9,19 @@ public class JiraBranchNameTests
         new(key, summary, "To Do", "new", type, null, DateTimeOffset.UnixEpoch);
 
     [Theory]
+    [InlineData("feature-SWEB-12903", "SWEB-12903")]
+    [InlineData("SWEB-12903-fix", "SWEB-12903")]
+    [InlineData("sweb-12903", "SWEB-12903")]
+    [InlineData("feature/sweb-12903-description", "SWEB-12903")]
+    [InlineData("just-a-branch", null)]
+    [InlineData("", null)]
+    [InlineData("123-abc", null)]
+    public void ExtractKey_ExtractsAndUpperCasesTheKey(string branchName, string? expectedKey)
+    {
+        Assert.Equal(expectedKey, JiraBranchName.ExtractKey(branchName));
+    }
+
+    [Theory]
     [InlineData("Bug", "SWEB-12903", "fix-SWEB-12903")]
     [InlineData("Story", "SWEB-12903", "feature-SWEB-12903")]
     [InlineData("Task", "SWEB-12903", "chore-SWEB-12903")]
