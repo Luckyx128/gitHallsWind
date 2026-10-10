@@ -56,6 +56,7 @@ public sealed partial class MainWindow : Window
         MainSelectorBar.SelectedItem = ChangesTab;
 
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        ViewModel.BranchCheckedOut += ViewModel_BranchCheckedOut;
 
         _ = StartAsync();
     }
@@ -486,6 +487,34 @@ public sealed partial class MainWindow : Window
 
     // MARK: - Quick actions
 
+    private async void ViewModel_BranchCheckedOut(object? sender, string branchName)
+    {
+        var keys = ViewModel.GetLinkedIssueKeys(branchName);
+        if (keys.Count == 0) return;
+
+        var key = keys.First();
+        var issue = JiraViewModel.FindIssue(key);
+        if (issue == null) return;
+
+        var clockify = JiraViewModel.ClockifyViewModel;
+        if (clockify.IsTimerRunning && clockify.RunningTimer?.Description?.Contains(key) == true) return;
+
+        var dialog = new ContentDialog
+        {
+            Title = "Start Timer?",
+            Content = $"You just checked out '{branchName}', which is linked to {key}. Would you like to start a timer for this issue?",
+            PrimaryButtonText = "Start Timer",
+            CloseButtonText = "Not Now",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            await clockify.StartTimerAsync(issue);
+        }
+    }
+
     private void RevealInExplorer_Click(object sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(ViewModel.RepositoryPath)) _platformActions.RevealInExplorer(ViewModel.RepositoryPath);
@@ -689,3 +718,4 @@ public sealed partial class MainWindow : Window
 
     public Visibility ToVisibility(bool isVisible) => isVisible ? Visibility.Visible : Visibility.Collapsed;
 }
+

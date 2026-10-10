@@ -153,4 +153,61 @@ public sealed partial class HistorySidebarPage : Page
             await ViewModel.GitgraphViewModel.DeleteBranchAsync(branchToDelete);
         }
     }
+
+    private void RevertCommit_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is GraphRow row)
+        {
+            _ = ViewModel.GitgraphViewModel.RevertCommitAsync(row.Commit.Hash);
+        }
+    }
+
+    private async void RenameBranch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is GraphRow row)
+        {
+            var localBranches = row.Commit.Refs.Where(r => !r.StartsWith("origin/") && !r.Contains("HEAD") && !r.StartsWith("tag:")).ToList();
+            if (localBranches.Count == 0) return;
+            var oldName = localBranches[0];
+            var textBox = new TextBox { Text = oldName, Width = 300 };
+            var dialog = new ContentDialog
+            {
+                Title = "Rename Branch",
+                Content = textBox,
+                PrimaryButtonText = "Rename",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                await ViewModel.GitgraphViewModel.RenameBranchAsync(oldName, textBox.Text.Trim());
+            }
+        }
+    }
+
+    private async void DeleteRemoteBranch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is GraphRow row)
+        {
+            var remoteBranches = row.Commit.Refs.Where(r => r.StartsWith("origin/") && !r.Contains("HEAD")).ToList();
+            if (remoteBranches.Count == 0) return;
+            var branchName = remoteBranches[0].Substring("origin/".Length);
+            var dialog = new ContentDialog
+            {
+                Title = "Delete Remote Branch",
+                Content = $"Are you sure you want to delete the remote branch '{branchName}'?",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                await ViewModel.GitgraphViewModel.DeleteRemoteBranchAsync(branchName);
+            }
+        }
+    }
 }
+
+

@@ -252,4 +252,63 @@ public partial class GitgraphViewModel : ObservableObject
             _repoViewModel.IsBusy = false;
         }
     }
+
+    public async Task RevertCommitAsync(string hash)
+    {
+        if (string.IsNullOrEmpty(_repoViewModel.RepositoryPath)) return;
+        _repoViewModel.IsBusy = true;
+        try
+        {
+            await _gitService.RevertCommitAsync(_repoViewModel.RepositoryPath, hash);
+            await _repoViewModel.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _repoViewModel.IsBusy = false;
+        }
+    }
+
+    public async Task RenameBranchAsync(string oldName, string newName)
+    {
+        if (string.IsNullOrEmpty(_repoViewModel.RepositoryPath)) return;
+        _repoViewModel.IsBusy = true;
+        try
+        {
+            await _gitService.RenameBranchAsync(_repoViewModel.RepositoryPath, oldName, newName);
+            await _repoViewModel.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _repoViewModel.IsBusy = false;
+        }
+    }
+
+    public async Task DeleteRemoteBranchAsync(string branchName)
+    {
+        if (string.IsNullOrEmpty(_repoViewModel.RepositoryPath)) return;
+        _repoViewModel.IsBusy = true;
+        try
+        {
+            await _gitService.DeleteRemoteBranchAsync(_repoViewModel.RepositoryPath, "origin", branchName);
+            await _repoViewModel.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _repoViewModel.IsBusy = false;
+        }
+    }
 }
+
+

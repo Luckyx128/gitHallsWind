@@ -206,6 +206,10 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _commitScope = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CommitButtonText))]
+    private bool _isAmending;
+
     /// <summary>Ahead/behind the upstream. Both zero and <see cref="HasUpstream"/> true means up to date.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentSyncAction), nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
@@ -1129,15 +1133,38 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         var summary = CommitSummary;
         var description = CommitDescription;
-        await RunGitAsync(path => _gitService.CommitAsync(path, summary, description));
+        var isAmending = IsAmending;
+        
+        await RunGitAsync(path => isAmending 
+            ? _gitService.AmendCommitAsync(path, summary, description)
+            : _gitService.CommitAsync(path, summary, description));
 
-        // Keep the message on failure â€” it is the one thing the user typed by hand.
+        // Keep the message on failure — it is the one thing the user typed by hand.
         if (HasError) return;
 
         CommitSummary = string.Empty;
         CommitDescription = string.Empty;
         CommitType = null;
         CommitScope = string.Empty;
+        IsAmending = false;
+    }
+
+    [RelayCommand]
+    public void LoadLastCommit()
+    {
+        var lastCommit = Commits.FirstOrDefault();
+        if (lastCommit != null)
+        {
+            CommitSummary = lastCommit.Summary;
+            var newlineIndex = lastCommit.Message.IndexOf('\n'); CommitDescription = newlineIndex >= 0 ? lastCommit.Message.Substring(newlineIndex + 1).Trim() : "";
+            IsAmending = true;
+        }
+    }
+
+    [RelayCommand]
+    public async Task UndoLastCommitAsync()
+    {
+        await RunGitAsync(path => _gitService.UndoLastCommitAsync(path));
     }
 
     /// <summary>
@@ -1169,24 +1196,32 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         await SwitchBranchAsync(branch.CheckoutName);
     }
 
+    public event EventHandler<string>? BranchCheckedOut;
+
     public async Task SwitchBranchAsync(string branchName)
     {
         if (string.IsNullOrWhiteSpace(branchName)) return;
 
         await RunGitAsync(path => _gitService.CheckoutAsync(path, branchName));
-        if (!HasError) PromoteRecentBranch(branchName);
+        if (!HasError) 
+        {
+            PromoteRecentBranch(branchName);
+            BranchCheckedOut?.Invoke(this, branchName);
+        }
     }
 
-    /// <summary>Creates a branch from the current HEAD and switches to it.</summary>
     public async Task CreateBranchAsync(string branchName)
     {
         var trimmed = branchName?.Trim() ?? string.Empty;
         if (trimmed.Length == 0) return;
 
         await RunGitAsync(path => _gitService.CreateBranchAsync(path, trimmed));
-        if (!HasError) PromoteRecentBranch(trimmed);
+        if (!HasError) 
+        {
+            PromoteRecentBranch(trimmed);
+            BranchCheckedOut?.Invoke(this, trimmed);
+        }
     }
-
     public async Task MergeBranchAsync(Branch branch)
     {
         if (branch == null) return;
@@ -1541,7 +1576,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(CommitButtonText), nameof(ShowMergeOrConflictBar), nameof(MergeOrConflictTitle), nameof(MergeOrConflictMessage), nameof(MergeOrConflictSeverity), nameof(ShowAbortMergeButton), nameof(AbortMergeVisibility))]
     private bool _isMerging;
 
-    public string CommitButtonText => IsMerging ? "Commit Merge" : "Commit";
+    public string CommitButtonText => IsMerging ? "Commit Merge" : IsAmending ? "Amend Commit" : "Commit";
 
     public bool ShowMergeOrConflictBar => IsMerging || HasConflicts;
 
@@ -1683,3 +1718,6 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     public void Dispose() => StopAutoRefresh();
 }
+
+
+

@@ -189,6 +189,22 @@
                     <InfoBar x:Name="ActionInfoBar" IsOpen="False" IsClosable="True" Severity="Success"
                              CloseButtonClick="ActionInfoBar_CloseButtonClick" />
                 </StackPanel>
+                                <!-- MARK: Clockify Timer -->
+                <StackPanel Style="{StaticResource GHCardPanelStyle}" Spacing="8" Padding="16,14">
+                    <TextBlock Text="Time Tracking" Style="{StaticResource GHSectionHeaderTextStyle}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IssueTimerText" Text="00:00:00" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        
+                        <Button x:Name="StartStopIssueTimerButton" Grid.Column="1" Height="32" Content="Start Timer" Margin="0,0,8,0" Click="StartStopIssueTimer_Click" />
+                        <Button x:Name="ManualTimeEntryButton" Grid.Column="2" Height="32" Content="Add Time Manually" Click="ManualTimeEntry_Click" />
+                    </Grid>
+                </StackPanel>
+
                 <!-- MARK: Linked Branches -->
                 <StackPanel Style="{StaticResource GHCardPanelStyle}"
                             Spacing="8" Padding="16,14">
@@ -219,3 +235,4 @@
         </ScrollViewer>
     </Grid>
 </Window>
+

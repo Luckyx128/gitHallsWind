@@ -55,6 +55,8 @@ public sealed partial class IssueWindow : Window
         UpdateRepositoryState();
 
         _ = LoadDetailAsync();
+        _jira.ClockifyViewModel.PropertyChanged += ClockifyViewModel_PropertyChanged;
+        UpdateTimerState();
     }
 
     // MARK: - The issue
@@ -342,6 +344,81 @@ public sealed partial class IssueWindow : Window
         BranchNameTextBox.Text = _suggestion;
     }
 
+    private void ClockifyViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ClockifyViewModel.Elapsed) || e.PropertyName == nameof(ClockifyViewModel.IsTimerRunning))
+        {
+            DispatcherQueue.TryEnqueue(UpdateTimerState);
+        }
+    }
+
+    private void UpdateTimerState()
+    {
+        var clockify = _jira.ClockifyViewModel;
+        var isThisIssue = clockify.RunningTimer?.Description?.Contains(_issue.Key) == true;
+        
+        if (isThisIssue && clockify.IsTimerRunning)
+        {
+            IssueTimerText.Text = clockify.Elapsed.ToString(@"hh\:mm\:ss");
+            IssueTimerText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green);
+            StartStopIssueTimerButton.Content = "Stop Timer";
+        }
+        else
+        {
+            IssueTimerText.Text = "00:00:00";
+            IssueTimerText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            StartStopIssueTimerButton.Content = "Start Timer";
+        }
+    }
+
+    private async void StartStopIssueTimer_Click(object sender, RoutedEventArgs e)
+    {
+        var clockify = _jira.ClockifyViewModel;
+        var isThisIssue = clockify.RunningTimer?.Description?.Contains(_issue.Key) == true;
+        
+        if (isThisIssue && clockify.IsTimerRunning)
+        {
+            await clockify.StopTimerAsync();
+        }
+        else
+        {
+            await clockify.StartTimerAsync(_issue);
+        }
+    }
+
+    private async void ManualTimeEntry_Click(object sender, RoutedEventArgs e)
+    {
+        var datePicker = new CalendarDatePicker { Date = DateTimeOffset.Now };
+        var startTimePicker = new TimePicker { Time = DateTimeOffset.Now.TimeOfDay.Subtract(TimeSpan.FromHours(1)) };
+        var endTimePicker = new TimePicker { Time = DateTimeOffset.Now.TimeOfDay };
+        
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(new TextBlock { Text = "Date" });
+        panel.Children.Add(datePicker);
+        panel.Children.Add(new TextBlock { Text = "Start Time" });
+        panel.Children.Add(startTimePicker);
+        panel.Children.Add(new TextBlock { Text = "End Time" });
+        panel.Children.Add(endTimePicker);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Manual Time Entry",
+            Content = panel,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            if (datePicker.Date.HasValue)
+            {
+                await _jira.ClockifyViewModel.AddManualTimeEntryAsync(_issue, datePicker.Date.Value, startTimePicker.Time, endTimePicker.Time);
+            }
+        }
+    }
+
     private void CreateBranch_Click(object sender, RoutedEventArgs e) => CreateBranch();
 
     private void CreateBranch() => _ = _repository.CreateBranchAsync(BranchNameTextBox.Text.Trim());
@@ -424,3 +501,4 @@ public sealed partial class IssueWindow : Window
         }
     }
 }
+

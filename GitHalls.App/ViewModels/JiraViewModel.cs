@@ -80,10 +80,14 @@ public partial class JiraViewModel : ObservableObject
     [ObservableProperty]
     private string? _actionIssueKey;
 
+    public ClockifyViewModel ClockifyViewModel { get; }
+
     public JiraViewModel(JiraAccountStore account, SettingsStore settings)
     {
         _account = account;
         _settings = settings;
+        ClockifyViewModel = new ClockifyViewModel(settings);
+        _ = ClockifyViewModel.InitializeAsync();
     }
 
     /// <summary>Presets first, then the user's own, in the order they were saved.</summary>
@@ -550,3 +554,4 @@ public partial class JiraViewModel : ObservableObject
         return credentials == null ? null : new JiraClient(credentials).BrowseUrl(issue.Key);
     }
 }
+

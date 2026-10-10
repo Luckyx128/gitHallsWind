@@ -441,6 +441,23 @@ public sealed partial class KanbanBoardPage : Page
         _ = ViewModel.RefreshAsync();
     }
 
+    private async void StartStopTimer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is GitHalls.Core.Jira.JiraIssue issue)
+        {
+            if (ViewModel.ClockifyViewModel.RunningTimer != null && ViewModel.ClockifyViewModel.RunningTimer.Description != null && ViewModel.ClockifyViewModel.RunningTimer.Description.Contains(issue.Key))
+            {
+                await ViewModel.ClockifyViewModel.StopTimerAsync();
+            }
+            else
+            {
+                await ViewModel.ClockifyViewModel.StartTimerAsync(issue);
+            }
+            // Update UI
+            Update();
+        }
+    }
+
     private void Connect_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
     private async void CreateIssue_Click(object sender, RoutedEventArgs e)
@@ -461,3 +478,4 @@ public sealed partial class KanbanBoardPage : Page
         }
     }
 }
+

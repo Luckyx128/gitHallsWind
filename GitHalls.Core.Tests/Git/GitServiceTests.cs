@@ -73,4 +73,100 @@ public class GitServiceTests
             return Task.FromResult((Array.Empty<byte>(), 0));
         }
     }
+
+    [Fact]
+    public async Task UndoLastCommitAsync_RunsResetSoft()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            return new GitProcessResult(0, "", "");
+        });
+        var service = new GitService(fakeRunner);
+
+        await service.UndoLastCommitAsync("C:\\dummy");
+
+        Assert.Equal(new[] { "reset", "--soft", "HEAD~1" }, invokedArgs);
+    }
+
+    [Fact]
+    public async Task AmendCommitAsync_RunsCommitAmend()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            return new GitProcessResult(0, "", "");
+        });
+        var service = new GitService(fakeRunner);
+
+        await service.AmendCommitAsync("C:\\dummy", "New Summary", "New Description");
+
+        Assert.Equal(new[] { "commit", "--amend", "-m", "New Summary", "-m", "New Description" }, invokedArgs);
+    }
+
+    [Fact]
+    public async Task AmendCommitAsync_WithoutDescription_RunsCommitAmendWithoutSecondMessage()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            return new GitProcessResult(0, "", "");
+        });
+        var service = new GitService(fakeRunner);
+
+        await service.AmendCommitAsync("C:\\dummy", "New Summary");
+
+        Assert.Equal(new[] { "commit", "--amend", "-m", "New Summary" }, invokedArgs);
+    }
+
+    [Fact]
+    public async Task RevertCommitAsync_RunsRevert()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            return new GitProcessResult(0, "", "");
+        });
+        var service = new GitService(fakeRunner);
+
+        await service.RevertCommitAsync("C:\\dummy", "abc1234");
+
+        Assert.Equal(new[] { "revert", "--no-edit", "abc1234" }, invokedArgs);
+    }
+
+    [Fact]
+    public async Task RenameBranchAsync_RunsBranchM()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            return new GitProcessResult(0, "", "");
+        });
+        var service = new GitService(fakeRunner);
+
+        await service.RenameBranchAsync("C:\\dummy", "old-name", "new-name");
+
+        Assert.Equal(new[] { "branch", "-m", "old-name", "new-name" }, invokedArgs);
+    }
+
+    [Fact]
+    public async Task DeleteRemoteBranchAsync_RunsPushDelete()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            return new GitProcessResult(0, "", "");
+        });
+        var service = new GitService(fakeRunner);
+
+        await service.DeleteRemoteBranchAsync("C:\\dummy", "origin", "branch-to-delete");
+
+        Assert.Equal(new[] { "push", "origin", "--delete", "branch-to-delete" }, invokedArgs);
+    }
 }

@@ -21,18 +21,31 @@
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
         </Style>
 
-        <DataTemplate x:Key="JiraIssueCardTemplate">
+                <DataTemplate x:Key="JiraIssueCardTemplate">
             <Grid Padding="12,10,12,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                   CornerRadius="4" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                   ToolTipService.ToolTip="{Binding Summary}">
                 <Grid.ContextFlyout>
                     <MenuFlyout Opening="CardMenu_Opening" />
                 </Grid.ContextFlyout>
-                <StackPanel Spacing="6">
-                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Key}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
-                    <TextBlock Text="{Binding AssigneeName}" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
-                </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Spacing="6" Grid.Row="0">
+                        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Key}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                        <TextBlock Text="{Binding AssigneeName}" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="4">
+                        <TextBlock Text="{Binding ElementName=PageRoot, Path=ViewModel.ClockifyViewModel.Elapsed, Converter={StaticResource TimeSpanToStringConverter}}" 
+                                   Visibility="Collapsed" x:Name="TimerText" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <Button Content="&#xE768;" FontFamily="{ThemeResource SymbolThemeFontFamily}" 
+                                FontSize="12" Padding="4" Background="Transparent" BorderThickness="0"
+                                Click="StartStopTimer_Click" Tag="{Binding}" />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </DataTemplate>
     </Page.Resources>
@@ -108,3 +121,4 @@
         </StackPanel>
     </Grid>
 </Page>
+

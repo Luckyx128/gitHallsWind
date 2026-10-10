@@ -125,8 +125,11 @@
                                 <MenuFlyoutItem Text="Checkout" Click="Checkout_Click" Tag="{x:Bind}" />
                                 <MenuFlyoutItem Text="Create branch here..." Click="CreateBranch_Click" Tag="{x:Bind}" />
                                 <MenuFlyoutItem Text="Merge into current branch" Click="Merge_Click" Tag="{x:Bind}" />
+                                <MenuFlyoutItem Text="Revert commit" Click="RevertCommit_Click" Tag="{x:Bind}" />
                                 <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Rename branch..." Click="RenameBranch_Click" Tag="{x:Bind}" />
                                 <MenuFlyoutItem Text="Delete branch..." Click="DeleteBranch_Click" Tag="{x:Bind}" />
+                                <MenuFlyoutItem Text="Delete remote branch..." Click="DeleteRemoteBranch_Click" Tag="{x:Bind}" />
                             </MenuFlyout>
                         </Grid.ContextFlyout>
                     </Grid>
@@ -135,3 +138,6 @@
         </ListView>
     </Grid>
 </Page>
+
+
+

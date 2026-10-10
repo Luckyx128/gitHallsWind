@@ -768,4 +768,36 @@ public class GitService
     {
         await _runner.RunAsync(repoPath, new[] { "merge", "--abort" }, cancellationToken: cancellationToken);
     }
+
+    public async Task UndoLastCommitAsync(string repoPath, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "reset", "--soft", "HEAD~1" }, cancellationToken: cancellationToken);
+    }
+
+    public async Task AmendCommitAsync(string repoPath, string summary, string? description = null, CancellationToken cancellationToken = default)
+    {
+        var args = new List<string> { "commit", "--amend", "-m", summary };
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            args.Add("-m");
+            args.Add(description);
+        }
+
+        await _runner.RunAsync(repoPath, args, cancellationToken: cancellationToken);
+    }
+
+    public async Task RevertCommitAsync(string repoPath, string hash, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "revert", "--no-edit", hash }, cancellationToken: cancellationToken);
+    }
+
+    public async Task RenameBranchAsync(string repoPath, string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "branch", "-m", oldName, newName }, cancellationToken: cancellationToken);
+    }
+
+    public async Task DeleteRemoteBranchAsync(string repoPath, string remote, string branchName, CancellationToken cancellationToken = default)
+    {
+        await _runner.RunAsync(repoPath, new[] { "push", remote, "--delete", branchName }, cancellationToken: cancellationToken);
+    }
 }

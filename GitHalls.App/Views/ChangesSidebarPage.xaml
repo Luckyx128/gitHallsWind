@@ -162,6 +162,16 @@
             <Button x:Name="CommitButton" Content="{x:Bind ViewModel.CommitButtonText, Mode=OneWay}" HorizontalAlignment="Stretch"
                     Style="{StaticResource AccentButtonStyle}"
                     Command="{x:Bind ViewModel.CommitCommand}" />
+
+            <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <HyperlinkButton Grid.Column="0" Content="Amend last commit" Command="{x:Bind ViewModel.LoadLastCommitCommand}" ToolTipService.ToolTip="Loads the last commit message and prepares to amend it" />
+                <HyperlinkButton Grid.Column="2" Content="Undo last commit" Command="{x:Bind ViewModel.UndoLastCommitCommand}" ToolTipService.ToolTip="Removes the last commit and keeps its changes in the working directory" />
+            </Grid>
         </StackPanel>
     </Grid>
 </Page>
