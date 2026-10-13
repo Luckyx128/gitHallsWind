@@ -39,6 +39,7 @@ public sealed partial class SettingsWindow : Window
     /// <summary>The identity being edited, or null while the form is a new one.</summary>
     private GitIdentity? _editing;
     private bool _updatingFontSize;
+    private bool _initialized;
 
     /// <summary>Raised when the Jira account is connected or disconnected.</summary>
     public event EventHandler? AccountChanged;
@@ -64,6 +65,8 @@ public sealed partial class SettingsWindow : Window
 
         SettingsSelectorBar.SelectedItem = GitTabItem;
         InitializeCustomizationTab();
+
+        _initialized = true;
     }
 
     // MARK: - Jira
@@ -272,7 +275,10 @@ public sealed partial class SettingsWindow : Window
 
     private void SettingsSelectorBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
     {
-        var selectedItem = sender.SelectedItem;
+        if (!_initialized) return;
+        if (GitPanel == null || JiraPanel == null || CustomizationPanel == null) return;
+
+        var selectedItem = sender?.SelectedItem;
         GitPanel.Visibility = selectedItem == GitTabItem ? Visibility.Visible : Visibility.Collapsed;
         JiraPanel.Visibility = selectedItem == JiraTabItem ? Visibility.Visible : Visibility.Collapsed;
         CustomizationPanel.Visibility = selectedItem == CustomizationTabItem ? Visibility.Visible : Visibility.Collapsed;
@@ -282,6 +288,11 @@ public sealed partial class SettingsWindow : Window
 
     private void InitializeCustomizationTab()
     {
+        if (ThemeComboBox == null || FontFamilyComboBox == null || FontSizeSlider == null || FontSizeNumberBox == null)
+        {
+            return;
+        }
+
         ThemeComboBox.ItemsSource = DiffTextTheme.AvailableThemes;
         var currentTheme = _settingsStore.Current.DiffThemeName;
         ThemeComboBox.SelectedItem = DiffTextTheme.AvailableThemes.Contains(currentTheme)
@@ -313,26 +324,38 @@ public sealed partial class SettingsWindow : Window
 
     private void LoadSampleDiffPreview()
     {
-        const string sampleDiffText =
-            "diff --git a/Settings.cs b/Settings.cs\n" +
-            "--- a/Settings.cs\n" +
-            "+++ b/Settings.cs\n" +
-            "@@ -10,6 +10,7 @@ public class ThemeManager\n" +
-            " {\n" +
-            "     public string Theme { get; set; } = \"Catppuccin\";\n" +
-            "-    private int _timeout = 30;\n" +
-            "+    private int _timeout = 60;\n" +
-            "+    public bool LivePreview { get; set; } = true;\n" +
-            " \n" +
-            "     public void ApplyTheme()\n" +
-            "     {\n";
+        try
+        {
+            if (PreviewDiffView == null) return;
 
-        var parsedDiff = new DiffParser().Parse("Settings.cs", sampleDiffText);
-        PreviewDiffView.SetDiff(parsedDiff);
+            const string sampleDiffText =
+                "diff --git a/Settings.cs b/Settings.cs\n" +
+                "--- a/Settings.cs\n" +
+                "+++ b/Settings.cs\n" +
+                "@@ -10,6 +10,7 @@ public class ThemeManager\n" +
+                " {\n" +
+                "     public string Theme { get; set; } = \"Catppuccin\";\n" +
+                "-    private int _timeout = 30;\n" +
+                "+    private int _timeout = 60;\n" +
+                "+    public bool LivePreview { get; set; } = true;\n" +
+                " \n" +
+                "     public void ApplyTheme()\n" +
+                "     {\n";
+
+            var parsedDiff = new DiffParser().Parse("Settings.cs", sampleDiffText);
+            PreviewDiffView.SetDiff(parsedDiff);
+        }
+        catch
+        {
+            // Defensive: ensure diff preview failure does not crash the SettingsWindow
+        }
     }
 
     private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_initialized) return;
+        if (ThemeComboBox == null) return;
+
         if (ThemeComboBox.SelectedItem is string themeName && !string.IsNullOrWhiteSpace(themeName))
         {
             DiffTextTheme.SetActiveTheme(themeName);
@@ -342,6 +365,9 @@ public sealed partial class SettingsWindow : Window
 
     private void FontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_initialized) return;
+        if (FontFamilyComboBox == null) return;
+
         if (FontFamilyComboBox.SelectedItem is string font && !string.IsNullOrWhiteSpace(font))
         {
             ApplyFontFamily(font);
@@ -350,7 +376,10 @@ public sealed partial class SettingsWindow : Window
 
     private void FontFamilyComboBox_TextSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
     {
-        if (!string.IsNullOrWhiteSpace(args.Text))
+        if (!_initialized) return;
+        if (FontFamilyComboBox == null) return;
+
+        if (!string.IsNullOrWhiteSpace(args?.Text))
         {
             ApplyFontFamily(args.Text.Trim());
         }
@@ -364,7 +393,10 @@ public sealed partial class SettingsWindow : Window
 
     private void FontSizeSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_initialized) return;
+        if (FontSizeNumberBox == null || FontSizeSlider == null) return;
         if (_updatingFontSize) return;
+
         _updatingFontSize = true;
         FontSizeNumberBox.Value = e.NewValue;
         ApplyFontSize(e.NewValue);
@@ -373,8 +405,11 @@ public sealed partial class SettingsWindow : Window
 
     private void FontSizeNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
+        if (!_initialized) return;
+        if (FontSizeSlider == null || FontSizeNumberBox == null) return;
         if (_updatingFontSize) return;
         if (double.IsNaN(args.NewValue) || args.NewValue < 10) return;
+
         _updatingFontSize = true;
         var clamped = Math.Clamp(args.NewValue, 10, 24);
         FontSizeSlider.Value = clamped;
