@@ -169,4 +169,36 @@ public class GitServiceTests
 
         Assert.Equal(new[] { "push", "origin", "--delete", "branch-to-delete" }, invokedArgs);
     }
+
+    [Fact]
+    public async Task GetRecentAuthorsAsync_DeduplicatesAndSortsAuthors()
+    {
+        var invokedArgs = new List<string>();
+        var fakeRunner = new FakeProcessRunner((dir, args) =>
+        {
+            invokedArgs.AddRange(args);
+            var output = "Lucas <lucas@test.com>\nAlice <alice@test.com>\nLucas <lucas@test.com>\nBob <bob@test.com>\n\n";
+            return new GitProcessResult(0, output, "");
+        });
+        var service = new GitService(fakeRunner);
+
+        var authors = await service.GetRecentAuthorsAsync("C:\\dummy", maxCount: 30);
+
+        Assert.Equal(new[] { "log", "-n 30", "--format=%an <%ae>" }, invokedArgs);
+        Assert.Equal(3, authors.Count);
+        Assert.Equal("Alice <alice@test.com>", authors[0]);
+        Assert.Equal("Bob <bob@test.com>", authors[1]);
+        Assert.Equal("Lucas <lucas@test.com>", authors[2]);
+    }
+
+    [Fact]
+    public async Task GetRecentAuthorsAsync_ReturnsEmptyWhenOutputEmpty()
+    {
+        var fakeRunner = new FakeProcessRunner((dir, args) => new GitProcessResult(0, "", ""));
+        var service = new GitService(fakeRunner);
+
+        var authors = await service.GetRecentAuthorsAsync("C:\\dummy");
+
+        Assert.Empty(authors);
+    }
 }

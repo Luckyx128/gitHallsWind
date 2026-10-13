@@ -469,4 +469,122 @@ public class JiraClientTests
         Assert.Contains("\"id\":\"31\"", handler.LastBody);
         Assert.Contains("\"summary\":\"Updated during transition\"", handler.LastBody);
     }
+
+    [Fact]
+    public async Task GetCommentsAsync_ReadsCommentsAndConvertsAdf()
+    {
+        const string body = """
+        {
+          "total": 1,
+          "comments": [
+            {
+              "id": "10001",
+              "author": { "accountId": "acc-1", "displayName": "Alice Smith" },
+              "body": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                  { "type": "paragraph", "content": [ { "type": "text", "text": "This is a comment" } ] }
+                ]
+              },
+              "created": "2026-08-07T14:00:00.000-0300",
+              "updated": "2026-08-07T14:30:00.000-0300"
+            }
+          ]
+        }
+        """;
+
+        var (client, handler) = ClientFor(HttpStatusCode.OK, body);
+
+        var comments = await client.GetCommentsAsync("PROJ-123");
+
+        var comment = Assert.Single(comments);
+        Assert.Equal("10001", comment.Id);
+        Assert.NotNull(comment.Author);
+        Assert.Equal("acc-1", comment.Author!.AccountId);
+        Assert.Equal("Alice Smith", comment.Author.DisplayName);
+        Assert.Equal("This is a comment", comment.Body);
+        Assert.Equal(2026, comment.Created.Year);
+        Assert.Equal(2026, comment.Updated.Year);
+
+        Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/PROJ-123/comment", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal("?orderBy=-created", handler.LastRequest.RequestUri.Query);
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_SendsAdfAndReturnsCreatedComment()
+    {
+        const string responseBody = """
+        {
+          "id": "10002",
+          "author": { "accountId": "acc-me", "displayName": "Me" },
+          "body": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+              { "type": "paragraph", "content": [ { "type": "text", "text": "New comment added" } ] }
+            ]
+          },
+          "created": "2026-08-07T15:00:00.000-0300",
+          "updated": "2026-08-07T15:00:00.000-0300"
+        }
+        """;
+
+        var (client, handler) = ClientFor(HttpStatusCode.Created, responseBody);
+
+        var comment = await client.AddCommentAsync("PROJ-123", "New comment added");
+
+        Assert.Equal("10002", comment.Id);
+        Assert.Equal("New comment added", comment.Body);
+        Assert.Equal("acc-me", comment.Author?.AccountId);
+
+        Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/PROJ-123/comment", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"type\":\"doc\"", handler.LastBody);
+        Assert.Contains("New comment added", handler.LastBody);
+    }
+
+    [Fact]
+    public async Task UpdateCommentAsync_SendsAdfAndReturnsUpdatedComment()
+    {
+        const string responseBody = """
+        {
+          "id": "10002",
+          "author": { "accountId": "acc-me", "displayName": "Me" },
+          "body": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+              { "type": "paragraph", "content": [ { "type": "text", "text": "Edited comment" } ] }
+            ]
+          },
+          "created": "2026-08-07T15:00:00.000-0300",
+          "updated": "2026-08-07T15:10:00.000-0300"
+        }
+        """;
+
+        var (client, handler) = ClientFor(HttpStatusCode.OK, responseBody);
+
+        var comment = await client.UpdateCommentAsync("PROJ-123", "10002", "Edited comment");
+
+        Assert.Equal("10002", comment.Id);
+        Assert.Equal("Edited comment", comment.Body);
+
+        Assert.Equal(HttpMethod.Put, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/PROJ-123/comment/10002", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"type\":\"doc\"", handler.LastBody);
+        Assert.Contains("Edited comment", handler.LastBody);
+    }
+
+    [Fact]
+    public async Task DeleteCommentAsync_SendsDeleteRequest()
+    {
+        var (client, handler) = ClientFor(HttpStatusCode.NoContent, string.Empty);
+
+        await client.DeleteCommentAsync("PROJ-123", "10002");
+
+        Assert.Equal(HttpMethod.Delete, handler.LastRequest!.Method);
+        Assert.Equal("/rest/api/3/issue/PROJ-123/comment/10002", handler.LastRequest.RequestUri!.AbsolutePath);
+    }
 }

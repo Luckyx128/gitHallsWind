@@ -76,6 +76,26 @@ public class JiraService : IJiraService
         return new JiraClient(credentials).MoveToSprintAsync(sprintId, keys, cancellationToken);
     }
 
+    public Task<IReadOnlyList<JiraComment>> GetCommentsAsync(JiraCredentials credentials, string issueKey, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).GetCommentsAsync(issueKey, cancellationToken);
+    }
+
+    public Task<JiraComment> AddCommentAsync(JiraCredentials credentials, string issueKey, string bodyText, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).AddCommentAsync(issueKey, bodyText, cancellationToken);
+    }
+
+    public Task<JiraComment> UpdateCommentAsync(JiraCredentials credentials, string issueKey, string commentId, string bodyText, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).UpdateCommentAsync(issueKey, commentId, bodyText, cancellationToken);
+    }
+
+    public Task DeleteCommentAsync(JiraCredentials credentials, string issueKey, string commentId, CancellationToken cancellationToken = default)
+    {
+        return new JiraClient(credentials).DeleteCommentAsync(issueKey, commentId, cancellationToken);
+    }
+
     public Uri BrowseUrl(JiraCredentials credentials, string key)
     {
         return new JiraClient(credentials).BrowseUrl(key);

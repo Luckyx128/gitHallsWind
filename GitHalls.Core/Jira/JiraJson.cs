@@ -234,6 +234,26 @@ internal sealed class JiraUpdateIssueFieldsDto
     public JiraUserDto? Assignee { get; set; }
 }
 
+internal sealed class JiraCommentDto
+{
+    public string? Id { get; set; }
+    public JiraUserDto? Author { get; set; }
+    public JsonElement? Body { get; set; }
+    public string? Created { get; set; }
+    public string? Updated { get; set; }
+}
+
+internal sealed class JiraCommentsResponse
+{
+    public int Total { get; set; }
+    public List<JiraCommentDto>? Comments { get; set; }
+}
+
+internal sealed class JiraCommentRequest
+{
+    public JsonElement Body { get; set; }
+}
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(JiraSearchRequest))]
 [JsonSerializable(typeof(JiraSearchResponse))]
@@ -247,6 +267,9 @@ internal sealed class JiraUpdateIssueFieldsDto
 [JsonSerializable(typeof(JiraCreateIssueResponse))]
 [JsonSerializable(typeof(JiraUpdateIssueRequest))]
 [JsonSerializable(typeof(JiraMoveToSprintRequest))]
+[JsonSerializable(typeof(JiraCommentDto))]
+[JsonSerializable(typeof(JiraCommentsResponse))]
+[JsonSerializable(typeof(JiraCommentRequest))]
 internal partial class JiraJsonContext : JsonSerializerContext
 {
 }

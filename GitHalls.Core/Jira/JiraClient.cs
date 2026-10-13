@@ -371,6 +371,62 @@ public sealed class JiraClient
         await SendAsync(request, cancellationToken);
     }
 
+    // MARK: - Comments
+
+    /// <summary>Lists comments on the issue ordered newest first.</summary>
+    public async Task<IReadOnlyList<JiraComment>> GetCommentsAsync(string issueKey, CancellationToken cancellationToken = default)
+    {
+        var path = IssuePath + Uri.EscapeDataString(issueKey) + "/comment?orderBy=-created";
+        var body = await SendAsync(Request(HttpMethod.Get, path), cancellationToken);
+
+        var response = Deserialize(body, JiraJsonContext.Default.JiraCommentsResponse);
+        if (response?.Comments == null) throw JiraException.Malformed();
+
+        var comments = new List<JiraComment>(response.Comments.Count);
+        foreach (var raw in response.Comments)
+        {
+            if (ToComment(raw) is { } comment)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    /// <summary>Adds a comment to the issue formatted as Atlassian Document Format.</summary>
+    public async Task<JiraComment> AddCommentAsync(string issueKey, string bodyText, CancellationToken cancellationToken = default)
+    {
+        var path = IssuePath + Uri.EscapeDataString(issueKey) + "/comment";
+        var request = Request(HttpMethod.Post, path);
+        SetJsonBody(request, new JiraCommentRequest { Body = JiraAdf.FromPlainText(bodyText) }, JiraJsonContext.Default.JiraCommentRequest);
+
+        var responseBody = await SendAsync(request, cancellationToken);
+        var raw = Deserialize(responseBody, JiraJsonContext.Default.JiraCommentDto);
+        return raw == null ? throw JiraException.Malformed() : ToComment(raw) ?? throw JiraException.Malformed();
+    }
+
+    /// <summary>Updates an existing comment on the issue formatted as Atlassian Document Format.</summary>
+    public async Task<JiraComment> UpdateCommentAsync(string issueKey, string commentId, string bodyText, CancellationToken cancellationToken = default)
+    {
+        var path = IssuePath + Uri.EscapeDataString(issueKey) + "/comment/" + Uri.EscapeDataString(commentId);
+        var request = Request(HttpMethod.Put, path);
+        SetJsonBody(request, new JiraCommentRequest { Body = JiraAdf.FromPlainText(bodyText) }, JiraJsonContext.Default.JiraCommentRequest);
+
+        var responseBody = await SendAsync(request, cancellationToken);
+        var raw = Deserialize(responseBody, JiraJsonContext.Default.JiraCommentDto);
+        return raw == null ? throw JiraException.Malformed() : ToComment(raw) ?? throw JiraException.Malformed();
+    }
+
+    /// <summary>Deletes a comment from the issue. 204, no body.</summary>
+    public async Task DeleteCommentAsync(string issueKey, string commentId, CancellationToken cancellationToken = default)
+    {
+        var path = IssuePath + Uri.EscapeDataString(issueKey) + "/comment/" + Uri.EscapeDataString(commentId);
+        var request = Request(HttpMethod.Delete, path);
+
+        await SendAsync(request, cancellationToken);
+    }
+
     /// <summary>Where a human opens this issue.</summary>
     public Uri BrowseUrl(string key) => new(SiteRoot + "/browse/" + Uri.EscapeDataString(key));
 
@@ -531,5 +587,22 @@ public sealed class JiraClient
             // none): the detail window tells the two apart.
             Description = fields?.Description == null ? null : JiraAdf.ToPlainText(fields.Description)
         };
+    }
+
+    private static JiraComment? ToComment(JiraCommentDto raw)
+    {
+        if (raw.Id is not { Length: > 0 } id) return null;
+
+        JiraAccount? author = null;
+        if (raw.Author?.AccountId is { Length: > 0 } accountId)
+        {
+            author = new JiraAccount(accountId, raw.Author.DisplayName ?? accountId);
+        }
+
+        var body = JiraAdf.ToPlainText(raw.Body);
+        var created = JiraTimestamp.Parse(raw.Created);
+        var updated = JiraTimestamp.Parse(raw.Updated);
+
+        return new JiraComment(id, author, body, created, updated);
     }
 }

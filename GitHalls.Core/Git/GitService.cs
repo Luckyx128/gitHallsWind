@@ -282,6 +282,32 @@ public class GitService
     }
 
     /// <summary>
+    /// Gets unique authors from recent commits formatted as "Name &lt;email&gt;".
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetRecentAuthorsAsync(string repoPath, int maxCount = 50, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _runner.RunAsync(
+                repoPath,
+                new[] { "log", $"-n {maxCount}", "--format=%an <%ae>" },
+                cancellationToken: cancellationToken);
+
+            var lines = result.StandardOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            return lines
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(author => author, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (GitException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    /// <summary>
     /// The branch a pull request goes into when the user picks none:
     /// "origin/HEAD", which a clone points at the remote's default branch.
     /// Null when it was never set — an old clone, or a repository with no remote.

@@ -21,5 +21,9 @@ public interface IJiraService
     Task<IReadOnlyList<JiraFieldOption>> FindTeamsAsync(JiraCredentials credentials, string query, string? autoCompleteUrl = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<JiraSprint>> GetOpenSprintsAsync(JiraCredentials credentials, string projectKey, CancellationToken cancellationToken = default);
     Task MoveToSprintAsync(JiraCredentials credentials, int sprintId, IEnumerable<string> keys, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JiraComment>> GetCommentsAsync(JiraCredentials credentials, string issueKey, CancellationToken cancellationToken = default);
+    Task<JiraComment> AddCommentAsync(JiraCredentials credentials, string issueKey, string bodyText, CancellationToken cancellationToken = default);
+    Task<JiraComment> UpdateCommentAsync(JiraCredentials credentials, string issueKey, string commentId, string bodyText, CancellationToken cancellationToken = default);
+    Task DeleteCommentAsync(JiraCredentials credentials, string issueKey, string commentId, CancellationToken cancellationToken = default);
     Uri BrowseUrl(JiraCredentials credentials, string key);
 }
