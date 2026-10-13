@@ -29,6 +29,8 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     private readonly GitHubCli _gitHubCli = new();
     private readonly SettingsStore _settingsStore;
     private readonly DispatcherQueue _dispatcher;
+    private readonly IJiraService _jiraService;
+    private readonly JiraAccountStore _jiraAccount;
 
     private DispatcherQueueTimer? _debounceTimer;
     private DispatcherQueueTimer? _pollTimer;
@@ -210,6 +212,83 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(CommitButtonText))]
     private bool _isAmending;
 
+    /// <summary>Authors from recent commits available to be selected as co-authors.</summary>
+    public ObservableCollection<string> AvailableCoAuthors { get; } = new();
+
+    /// <summary>Co-authors selected for the next commit.</summary>
+    public ObservableCollection<string> SelectedCoAuthors { get; } = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CoAuthorsButtonText))]
+    private bool _isCoAuthorsVisible;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FilteredCoAuthors))]
+    private string _coAuthorQuery = string.Empty;
+
+    public string CoAuthorsButtonText => SelectedCoAuthors.Count > 0
+        ? $"Co-authors ({SelectedCoAuthors.Count})"
+        : "Co-authors";
+
+    public IEnumerable<string> FilteredCoAuthors
+    {
+        get
+        {
+            var query = CoAuthorQuery?.Trim() ?? string.Empty;
+            return AvailableCoAuthors
+                .Where(a => !SelectedCoAuthors.Contains(a, StringComparer.OrdinalIgnoreCase))
+                .Where(a => string.IsNullOrEmpty(query) || a.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    public void AddSelectedCoAuthor(string author)
+    {
+        if (string.IsNullOrWhiteSpace(author)) return;
+        var trimmed = author.Trim();
+        if (!SelectedCoAuthors.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+        {
+            SelectedCoAuthors.Add(trimmed);
+            OnPropertyChanged(nameof(CoAuthorsButtonText));
+            OnPropertyChanged(nameof(FilteredCoAuthors));
+        }
+    }
+
+    public void RemoveSelectedCoAuthor(string author)
+    {
+        if (SelectedCoAuthors.Remove(author))
+        {
+            OnPropertyChanged(nameof(CoAuthorsButtonText));
+            OnPropertyChanged(nameof(FilteredCoAuthors));
+        }
+    }
+
+    public async Task LoadRecentAuthorsAsync()
+    {
+        var repoPath = RepositoryPath;
+        if (string.IsNullOrEmpty(repoPath))
+        {
+            AvailableCoAuthors.Clear();
+            OnPropertyChanged(nameof(FilteredCoAuthors));
+            return;
+        }
+
+        try
+        {
+            var authors = await _gitService.GetRecentAuthorsAsync(repoPath);
+            AvailableCoAuthors.Clear();
+            foreach (var author in authors)
+            {
+                AvailableCoAuthors.Add(author);
+            }
+            OnPropertyChanged(nameof(FilteredCoAuthors));
+        }
+        catch
+        {
+        }
+    }
+
+    public event EventHandler<PushCompletedEventArgs>? PushCompleted;
+
     /// <summary>Ahead/behind the upstream. Both zero and <see cref="HasUpstream"/> true means up to date.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentSyncAction), nameof(SyncTitle), nameof(SyncGlyph), nameof(CanSync))]
@@ -284,10 +363,12 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
     public GitgraphViewModel GitgraphViewModel { get; }
 
-    public RepositoryViewModel(GitService gitService, SettingsStore settingsStore)
+    public RepositoryViewModel(GitService gitService, SettingsStore settingsStore, IJiraService? jiraService = null, JiraAccountStore? jiraAccount = null)
     {
         _gitService = gitService;
         _settingsStore = settingsStore;
+        _jiraService = jiraService ?? new JiraService();
+        _jiraAccount = jiraAccount ?? new JiraAccountStore(settingsStore);
         
         GitgraphViewModel = new GitgraphViewModel(_gitService, this);
 
@@ -357,6 +438,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
 
         PromoteRecent(normalized);
         LoadRecentBranches();
+        _ = LoadRecentAuthorsAsync();
         StartAutoRefresh();
         _ = RefreshAsync();
     }
@@ -1134,12 +1216,17 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         var summary = CommitSummary;
         var description = CommitDescription;
         var isAmending = IsAmending;
+
+        if (SelectedCoAuthors.Count > 0)
+        {
+            description = CommitMessageFormatter.InjectCoAuthors(description, SelectedCoAuthors);
+        }
         
         await RunGitAsync(path => isAmending 
             ? _gitService.AmendCommitAsync(path, summary, description)
             : _gitService.CommitAsync(path, summary, description));
 
-        // Keep the message on failure — it is the one thing the user typed by hand.
+        // Keep the message on failure ï¿½ it is the one thing the user typed by hand.
         if (HasError) return;
 
         CommitSummary = string.Empty;
@@ -1147,6 +1234,9 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
         CommitType = null;
         CommitScope = string.Empty;
         IsAmending = false;
+        SelectedCoAuthors.Clear();
+        OnPropertyChanged(nameof(CoAuthorsButtonText));
+        OnPropertyChanged(nameof(FilteredCoAuthors));
     }
 
     [RelayCommand]
@@ -1258,8 +1348,40 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     public async Task PushAsync()
     {
         var publish = !HasUpstream;
+        var branchName = CurrentBranch?.Name;
+        IReadOnlyList<Commit> unpushedCommits = Array.Empty<Commit>();
+        string? repoName = null;
+
         await RunGitAsync(async path =>
         {
+            try
+            {
+                var unpushedHashes = await _gitService.GetUnpushedCommitHashesAsync(path);
+                var remoteUrl = await _gitService.GetRemoteUrlAsync(path);
+                var ownerRepo = PullRequestUrl.OwnerAndRepo(remoteUrl);
+                repoName = ownerRepo?.Repo ?? FolderName(path);
+
+                var allCommits = Commits.ToList();
+                var matched = allCommits.Where(c => unpushedHashes.Contains(c.Hash)).ToList();
+                if (matched.Count < unpushedHashes.Count)
+                {
+                    var log = await _gitService.GetLogAsync(path, 100);
+                    matched = log.Where(c => unpushedHashes.Contains(c.Hash)).ToList();
+                }
+
+                foreach (var c in matched)
+                {
+                    if (string.IsNullOrEmpty(c.Url) && ownerRepo != null)
+                    {
+                        c.Url = $"https://github.com/{ownerRepo.Value.Owner}/{ownerRepo.Value.Repo}/commit/{c.Hash}";
+                    }
+                }
+                unpushedCommits = matched;
+            }
+            catch
+            {
+            }
+
             try
             {
                 if (publish) await _gitService.PushPublishAsync(path);
@@ -1276,6 +1398,72 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
                 throw;
             }
         });
+
+        if (!HasError && !string.IsNullOrEmpty(branchName) && unpushedCommits.Count > 0)
+        {
+            await PostPushCommentsToJiraAsync(branchName, unpushedCommits, repoName);
+            PushCompleted?.Invoke(this, new PushCompletedEventArgs(branchName, unpushedCommits, repoName));
+        }
+    }
+
+    private static string FolderName(string path)
+    {
+        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        return string.IsNullOrEmpty(name) ? path : name;
+    }
+
+    private async Task PostPushCommentsToJiraAsync(string branchName, IReadOnlyList<Commit> commits, string? repoName)
+    {
+        var credentials = _jiraAccount.Current;
+        if (credentials == null) return;
+
+        var linkedKeys = GetLinkedIssueKeys(branchName);
+        if (linkedKeys.Count == 0) return;
+
+        foreach (var key in linkedKeys)
+        {
+            var upperKey = key.Trim().ToUpperInvariant();
+            var postedMap = _settingsStore.Current.PostedPushComments;
+            List<string>? alreadyPosted = null;
+            if (postedMap != null && postedMap.TryGetValue(upperKey, out var list))
+            {
+                alreadyPosted = list;
+            }
+
+            var newCommits = commits
+                .Where(c => alreadyPosted == null || !alreadyPosted.Contains(c.Hash, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            if (newCommits.Count == 0) continue;
+
+            var commentBody = JiraCommentGenerator.GeneratePostPushComment(newCommits, branchName, repoName);
+            if (string.IsNullOrWhiteSpace(commentBody)) continue;
+
+            try
+            {
+                await _jiraService.AddCommentAsync(credentials, upperKey, commentBody);
+
+                await _settingsStore.UpdateAsync(settings =>
+                {
+                    if (!settings.PostedPushComments.TryGetValue(upperKey, out var postedList))
+                    {
+                        postedList = new List<string>();
+                        settings.PostedPushComments[upperKey] = postedList;
+                    }
+                    foreach (var c in newCommits)
+                    {
+                        if (!postedList.Contains(c.Hash, StringComparer.OrdinalIgnoreCase))
+                        {
+                            postedList.Add(c.Hash);
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to post Jira push comment for {upperKey}: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>
@@ -1469,9 +1657,11 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
                         PullBlockedByLocalChanges = true;
                         throw;
                     }
-
-                    await _gitService.PushAsync(path);
                 });
+                if (!HasError)
+                {
+                    await PushAsync();
+                }
                 break;
         }
     }
@@ -1717,6 +1907,20 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     }
 
     public void Dispose() => StopAutoRefresh();
+}
+
+public sealed class PushCompletedEventArgs : EventArgs
+{
+    public string BranchName { get; }
+    public IReadOnlyList<Commit> Commits { get; }
+    public string? RepoName { get; }
+
+    public PushCompletedEventArgs(string branchName, IReadOnlyList<Commit> commits, string? repoName)
+    {
+        BranchName = branchName;
+        Commits = commits;
+        RepoName = repoName;
+    }
 }
 
 

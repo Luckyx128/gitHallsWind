@@ -37,6 +37,9 @@ public class AppSettings
 
     /// <summary>Tracks which PR destination branch prompts we've already shown for a given local branch. Keyed by repo path -> local branch -> hashset of destination branches.</summary>
     public Dictionary<string, Dictionary<string, HashSet<string>>> PromptedPrRules { get; set; } = new();
+
+    /// <summary>Commit hashes that have had post-push comments added to Jira, keyed by Jira issue key.</summary>
+    public Dictionary<string, List<string>> PostedPushComments { get; set; } = new();
 }
 
 /// <summary>

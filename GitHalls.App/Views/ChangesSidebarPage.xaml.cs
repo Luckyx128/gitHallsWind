@@ -237,4 +237,60 @@ public sealed partial class ChangesSidebarPage : Page
             await ViewModel.DiscardAsync(change);
         }
     }
+
+    private void ToggleCoAuthors_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel == null) return;
+        ViewModel.IsCoAuthorsVisible = !ViewModel.IsCoAuthorsVisible;
+    }
+
+    private void CoAuthorSuggestBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput && ViewModel != null)
+        {
+            ViewModel.CoAuthorQuery = sender.Text;
+        }
+    }
+
+    private void CoAuthorSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
+    {
+        if (args.SelectedItem is string author && ViewModel != null)
+        {
+            ViewModel.AddSelectedCoAuthor(author);
+            sender.Text = string.Empty;
+            ViewModel.CoAuthorQuery = string.Empty;
+        }
+    }
+
+    private void CoAuthorSuggestBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    {
+        if (ViewModel == null) return;
+        var text = args.ChosenSuggestion as string ?? args.QueryText;
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            ViewModel.AddSelectedCoAuthor(text);
+            sender.Text = string.Empty;
+            ViewModel.CoAuthorQuery = string.Empty;
+        }
+    }
+
+    private void AddCoAuthorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel == null) return;
+        var text = CoAuthorSuggestBox.Text;
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            ViewModel.AddSelectedCoAuthor(text);
+            CoAuthorSuggestBox.Text = string.Empty;
+            ViewModel.CoAuthorQuery = string.Empty;
+        }
+    }
+
+    private void RemoveCoAuthor_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string author } && ViewModel != null)
+        {
+            ViewModel.RemoveSelectedCoAuthor(author);
+        }
+    }
 }

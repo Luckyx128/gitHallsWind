@@ -103,6 +103,8 @@ public partial class JiraViewModel : ObservableObject
 
     public bool IsConfigured => _account.IsConfigured;
 
+    public JiraCredentials? Credentials => _account.Current;
+
     /// <summary>Issues a write is running on, so a card can show it and refuse a second click.</summary>
     public IReadOnlyCollection<string> BusyIssueKeys => _busyIssues;
 

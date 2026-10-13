@@ -22,6 +22,8 @@ public sealed partial class IssueWindow : Window
 {
     private readonly JiraViewModel _jira;
     private readonly RepositoryViewModel _repository;
+    private readonly IJiraService _jiraService = new JiraService();
+    private JiraCredentials? _credentials => _jira.Credentials;
 
     /// <summary>Cancelled when the window closes: a slow Jira must not touch a window that is gone.</summary>
     private readonly CancellationTokenSource _lifetime = new();
@@ -55,8 +57,17 @@ public sealed partial class IssueWindow : Window
         UpdateRepositoryState();
 
         _ = LoadDetailAsync();
+        _ = LoadCommentsAsync();
         _jira.ClockifyViewModel.PropertyChanged += ClockifyViewModel_PropertyChanged;
         UpdateTimerState();
+
+        var ctrlEnter = new KeyboardAccelerator { Key = VirtualKey.Enter, Modifiers = VirtualKeyModifiers.Control };
+        ctrlEnter.Invoked += async (s, args) =>
+        {
+            args.Handled = true;
+            await AddCommentAsync();
+        };
+        NewCommentTextBox.KeyboardAccelerators.Add(ctrlEnter);
     }
 
     // MARK: - The issue
@@ -500,5 +511,203 @@ public sealed partial class IssueWindow : Window
             UpdateRepositoryState();
         }
     }
+
+    // MARK: - Comments
+
+    public async Task LoadCommentsAsync()
+    {
+        if (_credentials == null) return;
+
+        CommentsRing.IsActive = true;
+        CommentsRing.Visibility = Visibility.Visible;
+        CommentsInfoBar.IsOpen = false;
+
+        try
+        {
+            var comments = await _jiraService.GetCommentsAsync(_credentials, _issue.Key, _lifetime.Token);
+            if (_lifetime.IsCancellationRequested) return;
+
+            var items = comments.Select(c => new IssueCommentItem(c)).ToList();
+            CommentsList.ItemsSource = items;
+            NoCommentsText.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            CommentCountText.Text = items.Count.ToString();
+            CommentCountBadge.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (_lifetime.IsCancellationRequested) return;
+            CommentsInfoBar.Message = ex.Message;
+            CommentsInfoBar.IsOpen = true;
+        }
+        finally
+        {
+            if (!_lifetime.IsCancellationRequested)
+            {
+                CommentsRing.IsActive = false;
+                CommentsRing.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private void NewCommentTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter)
+        {
+            var ctrl = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
+            if (ctrl.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+            {
+                e.Handled = true;
+                _ = AddCommentAsync();
+            }
+        }
+    }
+
+    private void AddCommentButton_Click(object sender, RoutedEventArgs e) => _ = AddCommentAsync();
+
+    private async Task AddCommentAsync()
+    {
+        if (_credentials == null)
+        {
+            CommentsInfoBar.Message = "Jira is not connected.";
+            CommentsInfoBar.IsOpen = true;
+            return;
+        }
+
+        var body = NewCommentTextBox.Text.Trim();
+        if (string.IsNullOrEmpty(body)) return;
+
+        AddCommentButton.IsEnabled = false;
+        CommentsRing.IsActive = true;
+        CommentsRing.Visibility = Visibility.Visible;
+        CommentsInfoBar.IsOpen = false;
+
+        try
+        {
+            await _jiraService.AddCommentAsync(_credentials, _issue.Key, body, _lifetime.Token);
+            NewCommentTextBox.Text = string.Empty;
+            await LoadCommentsAsync();
+        }
+        catch (Exception ex)
+        {
+            CommentsInfoBar.Message = ex.Message;
+            CommentsInfoBar.IsOpen = true;
+        }
+        finally
+        {
+            AddCommentButton.IsEnabled = true;
+            CommentsRing.IsActive = false;
+            CommentsRing.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void EditComment_Click(object sender, RoutedEventArgs e)
+    {
+        if (_credentials == null) return;
+        if (sender is not FrameworkElement { Tag: IssueCommentItem item }) return;
+
+        var textBox = new TextBox
+        {
+            Text = item.Body,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            Height = 120
+        };
+
+        var dialog = new ContentDialog
+        {
+            Title = "Edit Comment",
+            Content = textBox,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            var updatedText = textBox.Text.Trim();
+            if (string.IsNullOrEmpty(updatedText) || updatedText == item.Body) return;
+
+            CommentsRing.IsActive = true;
+            CommentsRing.Visibility = Visibility.Visible;
+            CommentsInfoBar.IsOpen = false;
+
+            try
+            {
+                await _jiraService.UpdateCommentAsync(_credentials, _issue.Key, item.Id, updatedText, _lifetime.Token);
+                await LoadCommentsAsync();
+            }
+            catch (Exception ex)
+            {
+                CommentsInfoBar.Message = ex.Message;
+                CommentsInfoBar.IsOpen = true;
+            }
+            finally
+            {
+                CommentsRing.IsActive = false;
+                CommentsRing.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private async void DeleteComment_Click(object sender, RoutedEventArgs e)
+    {
+        if (_credentials == null) return;
+        if (sender is not FrameworkElement { Tag: IssueCommentItem item }) return;
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete Comment",
+            Content = "Are you sure you want to delete this comment? This cannot be undone.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            CommentsRing.IsActive = true;
+            CommentsRing.Visibility = Visibility.Visible;
+            CommentsInfoBar.IsOpen = false;
+
+            try
+            {
+                await _jiraService.DeleteCommentAsync(_credentials, _issue.Key, item.Id, _lifetime.Token);
+                await LoadCommentsAsync();
+            }
+            catch (Exception ex)
+            {
+                CommentsInfoBar.Message = ex.Message;
+                CommentsInfoBar.IsOpen = true;
+            }
+            finally
+            {
+                CommentsRing.IsActive = false;
+                CommentsRing.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+}
+
+public sealed class IssueCommentItem
+{
+    public JiraComment Comment { get; }
+    public string Id => Comment.Id;
+    public string AuthorName => Comment.Author?.DisplayName ?? "Unknown";
+    public string Body => Comment.Body;
+    public string CreatedFormatted => FormatDate(Comment.Created);
+
+    public IssueCommentItem(JiraComment comment)
+    {
+        Comment = comment;
+    }
+
+    private static string FormatDate(DateTimeOffset date) =>
+        date == default ? "—" : date.ToLocalTime().ToString("d MMM yyyy, HH:mm");
 }
 

@@ -231,6 +231,91 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
+
+                <!-- MARK: Comments -->
+                <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                            Spacing="10" Padding="16,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="Comments" Style="{StaticResource GHSectionHeaderTextStyle}" VerticalAlignment="Center" />
+                            <Border x:Name="CommentCountBadge" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                    CornerRadius="10" Padding="8,2" VerticalAlignment="Center" Visibility="Collapsed">
+                                <TextBlock x:Name="CommentCountText" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                        </StackPanel>
+                        <ProgressRing x:Name="CommentsRing" Grid.Column="1" Width="16" Height="16" IsActive="False"
+                                      Visibility="Collapsed" HorizontalAlignment="Right" />
+                    </Grid>
+
+                    <InfoBar x:Name="CommentsInfoBar" IsOpen="False" IsClosable="True" Severity="Error" />
+
+                    <!-- Comments List -->
+                    <ItemsControl x:Name="CommentsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="6" Padding="12,10">
+                                    <StackPanel Spacing="6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Author & Date -->
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AuthorName}" FontWeight="SemiBold" FontSize="13" />
+                                                <TextBlock Text="{Binding CreatedFormatted}" Style="{StaticResource GHCaptionTextStyle}" VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <!-- Edit button -->
+                                            <Button Grid.Column="1" ToolTipService.ToolTip="Edit comment"
+                                                    Background="Transparent" BorderThickness="0" Padding="6,4" MinHeight="0" MinWidth="0" Margin="0,0,4,0"
+                                                    Click="EditComment_Click" Tag="{Binding}">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </Button>
+
+                                            <!-- Delete button -->
+                                            <Button Grid.Column="2" ToolTipService.ToolTip="Delete comment"
+                                                    Background="Transparent" BorderThickness="0" Padding="6,4" MinHeight="0" MinWidth="0"
+                                                    Click="DeleteComment_Click" Tag="{Binding}">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </Button>
+                                        </Grid>
+
+                                        <!-- Comment Body -->
+                                        <TextBlock Text="{Binding Body}" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="13" LineHeight="18" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="NoCommentsText" Text="No comments yet." Style="{StaticResource GHCaptionTextStyle}"
+                               Visibility="Collapsed" Margin="0,4,0,8" />
+
+                    <!-- New comment input -->
+                    <TextBox x:Name="NewCommentTextBox"
+                             PlaceholderText="Add a comment... (Ctrl+Enter to post)"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             MinHeight="72"
+                             KeyDown="NewCommentTextBox_KeyDown" />
+
+                    <Grid>
+                        <TextBlock Text="Press Ctrl+Enter to post" Style="{StaticResource GHCaptionTextStyle}"
+                                   VerticalAlignment="Center" HorizontalAlignment="Left" />
+                        <Button x:Name="AddCommentButton" Content="Add Comment" Style="{StaticResource AccentButtonStyle}"
+                                HorizontalAlignment="Right" Click="AddCommentButton_Click" />
+                    </Grid>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>

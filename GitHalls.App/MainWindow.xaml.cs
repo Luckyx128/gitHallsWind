@@ -44,9 +44,8 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         this.ConfigureCustomTitleBar(AppTitleBar);
 
-        ViewModel = new RepositoryViewModel(_gitService, _settingsStore);
-
         _jiraAccount = new JiraAccountStore(_settingsStore);
+        ViewModel = new RepositoryViewModel(_gitService, _settingsStore, jiraAccount: _jiraAccount);
         JiraViewModel = new JiraViewModel(_jiraAccount, _settingsStore);
         JiraViewModel.PropertyChanged += JiraViewModel_PropertyChanged;
 
@@ -57,8 +56,21 @@ public sealed partial class MainWindow : Window
 
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         ViewModel.BranchCheckedOut += ViewModel_BranchCheckedOut;
+        ViewModel.PushCompleted += ViewModel_PushCompleted;
 
         _ = StartAsync();
+    }
+
+    private void ViewModel_PushCompleted(object? sender, PushCompletedEventArgs e)
+    {
+        var linkedKeys = ViewModel.GetLinkedIssueKeys(e.BranchName);
+        foreach (var key in linkedKeys)
+        {
+            if (_issueWindows.TryGetValue(key, out var openWindow))
+            {
+                DispatcherQueue.TryEnqueue(() => _ = openWindow.LoadCommentsAsync());
+            }
+        }
     }
 
     /// <summary>
