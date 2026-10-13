@@ -1,10 +1,13 @@
 using GitHalls.App.Helpers;
 using GitHalls.App.Services;
+using GitHalls.App.Themes;
 using GitHalls.App.ViewModels;
+using GitHalls.Core.Git.Parsers;
 using GitHalls.Core.Jira;
 using GitHalls.Core.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using System.Collections.ObjectModel;
 
 namespace GitHalls.App.Views;
@@ -23,33 +26,32 @@ public sealed class IdentityListRow
 }
 
 /// <summary>
-/// Account settings: the Jira connection and the git identities.
-///
-/// A window of its own rather than a dialog — it is the one screen the user
-/// comes back to, and both halves are forms with several fields and their own
-/// failure states.
+/// App settings: Git identities, Jira connection, and UI/theme customization.
 /// </summary>
 public sealed partial class SettingsWindow : Window
 {
     private readonly JiraAccountStore _account;
     private readonly RepositoryViewModel _repository;
+    private readonly SettingsStore _settingsStore;
 
     private readonly ObservableCollection<IdentityListRow> _identities = new();
 
     /// <summary>The identity being edited, or null while the form is a new one.</summary>
     private GitIdentity? _editing;
+    private bool _updatingFontSize;
 
     /// <summary>Raised when the Jira account is connected or disconnected.</summary>
     public event EventHandler? AccountChanged;
 
-    public SettingsWindow(JiraAccountStore account, RepositoryViewModel repository)
+    public SettingsWindow(JiraAccountStore account, RepositoryViewModel repository, SettingsStore? settingsStore = null)
     {
         _account = account;
         _repository = repository;
+        _settingsStore = settingsStore ?? new SettingsStore();
 
         InitializeComponent();
         this.ConfigureCustomTitleBar(AppTitleBar);
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(620, 900));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(760, 720));
 
         IdentityList.ItemsSource = _identities;
 
@@ -59,6 +61,9 @@ public sealed partial class SettingsWindow : Window
         ReloadIdentities();
         UpdateJiraState();
         NewIdentity_Click(this, new RoutedEventArgs());
+
+        SettingsSelectorBar.SelectedItem = GitTabItem;
+        InitializeCustomizationTab();
     }
 
     // MARK: - Jira
@@ -261,5 +266,127 @@ public sealed partial class SettingsWindow : Window
         IdentityInfoBar.Message = message;
         IdentityInfoBar.Severity = severity;
         IdentityInfoBar.IsOpen = true;
+    }
+
+    // MARK: - Tabs
+
+    private void SettingsSelectorBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    {
+        var selectedItem = sender.SelectedItem;
+        GitPanel.Visibility = selectedItem == GitTabItem ? Visibility.Visible : Visibility.Collapsed;
+        JiraPanel.Visibility = selectedItem == JiraTabItem ? Visibility.Visible : Visibility.Collapsed;
+        CustomizationPanel.Visibility = selectedItem == CustomizationTabItem ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // MARK: - Customization
+
+    private void InitializeCustomizationTab()
+    {
+        ThemeComboBox.ItemsSource = DiffTextTheme.AvailableThemes;
+        var currentTheme = _settingsStore.Current.DiffThemeName;
+        ThemeComboBox.SelectedItem = DiffTextTheme.AvailableThemes.Contains(currentTheme)
+            ? currentTheme
+            : DiffTextTheme.ThemeSystem;
+
+        var installedFonts = FontService.GetInstalledFonts();
+        FontFamilyComboBox.ItemsSource = installedFonts;
+
+        var currentFont = string.IsNullOrWhiteSpace(_settingsStore.Current.DiffFontFamily)
+            ? DiffTextTheme.FontFamily
+            : _settingsStore.Current.DiffFontFamily;
+
+        FontFamilyComboBox.SelectedItem = installedFonts.FirstOrDefault(f => string.Equals(f, currentFont, StringComparison.OrdinalIgnoreCase)) ?? currentFont;
+        FontFamilyComboBox.Text = currentFont;
+
+        var currentFontSize = _settingsStore.Current.DiffFontSize > 0
+            ? _settingsStore.Current.DiffFontSize
+            : DiffTextTheme.FontSize;
+
+        _updatingFontSize = true;
+        var clampedSize = Math.Clamp(currentFontSize, 10, 24);
+        FontSizeSlider.Value = clampedSize;
+        FontSizeNumberBox.Value = clampedSize;
+        _updatingFontSize = false;
+
+        LoadSampleDiffPreview();
+    }
+
+    private void LoadSampleDiffPreview()
+    {
+        const string sampleDiffText =
+            "diff --git a/Settings.cs b/Settings.cs\n" +
+            "--- a/Settings.cs\n" +
+            "+++ b/Settings.cs\n" +
+            "@@ -10,6 +10,7 @@ public class ThemeManager\n" +
+            " {\n" +
+            "     public string Theme { get; set; } = \"Catppuccin\";\n" +
+            "-    private int _timeout = 30;\n" +
+            "+    private int _timeout = 60;\n" +
+            "+    public bool LivePreview { get; set; } = true;\n" +
+            " \n" +
+            "     public void ApplyTheme()\n" +
+            "     {\n";
+
+        var parsedDiff = new DiffParser().Parse("Settings.cs", sampleDiffText);
+        PreviewDiffView.SetDiff(parsedDiff);
+    }
+
+    private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemeComboBox.SelectedItem is string themeName && !string.IsNullOrWhiteSpace(themeName))
+        {
+            DiffTextTheme.SetActiveTheme(themeName);
+            _ = _settingsStore.UpdateAsync(s => s.DiffThemeName = themeName);
+        }
+    }
+
+    private void FontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (FontFamilyComboBox.SelectedItem is string font && !string.IsNullOrWhiteSpace(font))
+        {
+            ApplyFontFamily(font);
+        }
+    }
+
+    private void FontFamilyComboBox_TextSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
+    {
+        if (!string.IsNullOrWhiteSpace(args.Text))
+        {
+            ApplyFontFamily(args.Text.Trim());
+        }
+    }
+
+    private void ApplyFontFamily(string font)
+    {
+        DiffTextTheme.UpdateMetrics(font, DiffTextTheme.FontSize, DiffTextTheme.GutterFontSize, DiffTextTheme.LineHeight);
+        _ = _settingsStore.UpdateAsync(s => s.DiffFontFamily = font);
+    }
+
+    private void FontSizeSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingFontSize) return;
+        _updatingFontSize = true;
+        FontSizeNumberBox.Value = e.NewValue;
+        ApplyFontSize(e.NewValue);
+        _updatingFontSize = false;
+    }
+
+    private void FontSizeNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingFontSize) return;
+        if (double.IsNaN(args.NewValue) || args.NewValue < 10) return;
+        _updatingFontSize = true;
+        var clamped = Math.Clamp(args.NewValue, 10, 24);
+        FontSizeSlider.Value = clamped;
+        ApplyFontSize(clamped);
+        _updatingFontSize = false;
+    }
+
+    private void ApplyFontSize(double size)
+    {
+        var gutterSize = Math.Max(10, size - 1);
+        var lineHeight = Math.Round(size * 1.46);
+        DiffTextTheme.UpdateMetrics(DiffTextTheme.FontFamily, size, gutterSize, lineHeight);
+        _ = _settingsStore.UpdateAsync(s => s.DiffFontSize = size);
     }
 }

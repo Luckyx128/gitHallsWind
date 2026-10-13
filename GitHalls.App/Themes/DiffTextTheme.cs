@@ -82,7 +82,35 @@ public sealed class DiffTextTheme
         _ => null
     };
 
-    public static DiffTextTheme For(ElementTheme theme) => theme == ElementTheme.Dark ? Dark : Light;
+    public const string ThemeSystem = "Padrão do Sistema";
+    public const string ThemeCatppuccinMocha = "Catppuccin Mocha";
+    public const string ThemeCatppuccinLatte = "Catppuccin Latte";
+    public const string ThemeDracula = "Dracula";
+
+    public static readonly IReadOnlyList<string> AvailableThemes =
+    [
+        ThemeSystem,
+        ThemeCatppuccinMocha,
+        ThemeCatppuccinLatte,
+        ThemeDracula
+    ];
+
+    public static string ActiveThemeName { get; private set; } = ThemeSystem;
+    public static event EventHandler? ThemeChanged;
+
+    public static void SetActiveTheme(string? themeName)
+    {
+        ActiveThemeName = string.IsNullOrWhiteSpace(themeName) ? ThemeSystem : themeName;
+        ThemeChanged?.Invoke(null, EventArgs.Empty);
+    }
+
+    public static DiffTextTheme For(ElementTheme theme) => ActiveThemeName switch
+    {
+        ThemeCatppuccinMocha => CatppuccinMocha,
+        ThemeCatppuccinLatte => CatppuccinLatte,
+        ThemeDracula => Dracula,
+        _ => theme == ElementTheme.Dark ? Dark : Light
+    };
 
     // The addition and deletion values below are GHAdditionColor and
     // GHDeletionColor from Styles/AppStyles.xaml, which is where the palette is
@@ -152,6 +180,102 @@ public sealed class DiffTextTheme
             [DiffTokenKind.Preprocessor] = Color.FromArgb(255, 253, 143, 63),
             [DiffTokenKind.Attribute] = Color.FromArgb(255, 191, 160, 100),
             [DiffTokenKind.Operator] = Color.FromArgb(255, 224, 224, 224),
+        }
+    };
+
+    public static readonly DiffTextTheme CatppuccinMocha = new()
+    {
+        ViewBackground = Color.FromArgb(255, 30, 30, 46),       // Base #1E1E2E
+        BaseText = Color.FromArgb(255, 205, 214, 244),         // Text #CDD6F4
+        HunkHeaderText = Color.FromArgb(255, 137, 180, 250),   // Blue #89B4FA
+        HunkHeaderBackground = Color.FromArgb(38, 137, 180, 250),
+        AdditionBackground = Color.FromArgb(38, 166, 227, 161), // Green #A6E3A1
+        DeletionBackground = Color.FromArgb(38, 243, 139, 168), // Red #F38BA8
+        GutterBackground = Color.FromArgb(255, 24, 24, 37),     // Mantle #181825
+        GutterText = Color.FromArgb(255, 108, 112, 134),       // Overlay0 #6C7086
+        GutterSeparator = Color.FromArgb(255, 49, 50, 68),      // Surface0 #313244
+        AdditionMarker = Color.FromArgb(255, 166, 227, 161),   // Green #A6E3A1
+        DeletionMarker = Color.FromArgb(255, 243, 139, 168),   // Red #F38BA8
+        SearchHighlight = Color.FromArgb(120, 249, 226, 175),  // Yellow #F9E2AF
+        SelectionBackground = Color.FromArgb(50, 180, 190, 254), // Lavender #B4BEFE
+        HoverBackground = Color.FromArgb(25, 180, 190, 254),
+        SelectionMark = Color.FromArgb(255, 180, 190, 254),    // Lavender #B4BEFE
+        SelectionMarkIdle = Color.FromArgb(255, 88, 91, 112),  // Surface2 #585B70
+        Tokens = new Dictionary<DiffTokenKind, Color>
+        {
+            [DiffTokenKind.Plain] = Color.FromArgb(255, 205, 214, 244),        // Text #CDD6F4
+            [DiffTokenKind.Keyword] = Color.FromArgb(255, 203, 166, 247),      // Mauve #CBA6F7
+            [DiffTokenKind.Comment] = Color.FromArgb(255, 108, 112, 134),      // Overlay0 #6C7086
+            [DiffTokenKind.String] = Color.FromArgb(255, 166, 227, 161),       // Green #A6E3A1
+            [DiffTokenKind.Number] = Color.FromArgb(255, 250, 179, 135),       // Peach #FAB387
+            [DiffTokenKind.Type] = Color.FromArgb(255, 249, 226, 175),         // Yellow #F9E2AF
+            [DiffTokenKind.Preprocessor] = Color.FromArgb(255, 245, 194, 231), // Pink #F5C2E7
+            [DiffTokenKind.Attribute] = Color.FromArgb(255, 137, 180, 250),    // Blue #89B4FA
+            [DiffTokenKind.Operator] = Color.FromArgb(255, 137, 220, 235),     // Sky #89DCEB
+        }
+    };
+
+    public static readonly DiffTextTheme CatppuccinLatte = new()
+    {
+        ViewBackground = Color.FromArgb(255, 239, 241, 245),   // Base #EFF1F5
+        BaseText = Color.FromArgb(255, 76, 79, 105),           // Text #4C4F69
+        HunkHeaderText = Color.FromArgb(255, 30, 102, 245),     // Blue #1E66F5
+        HunkHeaderBackground = Color.FromArgb(30, 30, 102, 245),
+        AdditionBackground = Color.FromArgb(38, 64, 160, 43),   // Green #40A02B
+        DeletionBackground = Color.FromArgb(38, 210, 15, 57),   // Red #D20F39
+        GutterBackground = Color.FromArgb(255, 230, 233, 239), // Mantle #E6E9EF
+        GutterText = Color.FromArgb(255, 156, 160, 176),       // Overlay0 #9CA0B0
+        GutterSeparator = Color.FromArgb(255, 204, 208, 218),  // Surface0 #CCD0DA
+        AdditionMarker = Color.FromArgb(255, 64, 160, 43),     // Green #40A02B
+        DeletionMarker = Color.FromArgb(255, 210, 15, 57),     // Red #D20F39
+        SearchHighlight = Color.FromArgb(120, 223, 142, 29),   // Yellow #DF8E1D
+        SelectionBackground = Color.FromArgb(45, 114, 135, 253), // Lavender #7287FD
+        HoverBackground = Color.FromArgb(22, 114, 135, 253),
+        SelectionMark = Color.FromArgb(255, 114, 135, 253),    // Lavender #7287FD
+        SelectionMarkIdle = Color.FromArgb(255, 188, 192, 204), // Surface1 #BCC0CC
+        Tokens = new Dictionary<DiffTokenKind, Color>
+        {
+            [DiffTokenKind.Plain] = Color.FromArgb(255, 76, 79, 105),          // Text #4C4F69
+            [DiffTokenKind.Keyword] = Color.FromArgb(255, 136, 57, 239),       // Mauve #8839EF
+            [DiffTokenKind.Comment] = Color.FromArgb(255, 156, 160, 176),      // Overlay0 #9CA0B0
+            [DiffTokenKind.String] = Color.FromArgb(255, 64, 160, 43),         // Green #40A02B
+            [DiffTokenKind.Number] = Color.FromArgb(255, 254, 100, 11),        // Peach #FE640B
+            [DiffTokenKind.Type] = Color.FromArgb(255, 223, 142, 29),          // Yellow #DF8E1D
+            [DiffTokenKind.Preprocessor] = Color.FromArgb(255, 234, 118, 203), // Pink #EA76CB
+            [DiffTokenKind.Attribute] = Color.FromArgb(255, 30, 102, 245),     // Blue #1E66F5
+            [DiffTokenKind.Operator] = Color.FromArgb(255, 4, 165, 229),       // Sky #04A5E5
+        }
+    };
+
+    public static readonly DiffTextTheme Dracula = new()
+    {
+        ViewBackground = Color.FromArgb(255, 40, 42, 54),       // Background #282A36
+        BaseText = Color.FromArgb(255, 248, 248, 242),         // Foreground #F8F8F2
+        HunkHeaderText = Color.FromArgb(255, 189, 147, 249),   // Purple #BD93F9
+        HunkHeaderBackground = Color.FromArgb(38, 189, 147, 249),
+        AdditionBackground = Color.FromArgb(40, 80, 250, 123),  // Green #50FA7B
+        DeletionBackground = Color.FromArgb(40, 255, 85, 85),   // Red #FF5555
+        GutterBackground = Color.FromArgb(255, 33, 34, 44),     // Darker Background #21222C
+        GutterText = Color.FromArgb(255, 98, 114, 164),        // Comment #6272A4
+        GutterSeparator = Color.FromArgb(255, 68, 71, 90),      // Selection #44475A
+        AdditionMarker = Color.FromArgb(255, 80, 250, 123),    // Green #50FA7B
+        DeletionMarker = Color.FromArgb(255, 255, 85, 85),     // Red #FF5555
+        SearchHighlight = Color.FromArgb(120, 241, 250, 140),  // Yellow #F1FA8C
+        SelectionBackground = Color.FromArgb(50, 189, 147, 249), // Purple #BD93F9
+        HoverBackground = Color.FromArgb(25, 189, 147, 249),
+        SelectionMark = Color.FromArgb(255, 189, 147, 249),    // Purple #BD93F9
+        SelectionMarkIdle = Color.FromArgb(255, 98, 114, 164),  // Comment #6272A4
+        Tokens = new Dictionary<DiffTokenKind, Color>
+        {
+            [DiffTokenKind.Plain] = Color.FromArgb(255, 248, 248, 242),        // Foreground #F8F8F2
+            [DiffTokenKind.Keyword] = Color.FromArgb(255, 255, 121, 198),      // Pink #FF79C6
+            [DiffTokenKind.Comment] = Color.FromArgb(255, 98, 114, 164),       // Comment #6272A4
+            [DiffTokenKind.String] = Color.FromArgb(255, 241, 250, 140),       // Yellow #F1FA8C
+            [DiffTokenKind.Number] = Color.FromArgb(255, 189, 147, 249),       // Purple #BD93F9
+            [DiffTokenKind.Type] = Color.FromArgb(255, 139, 233, 253),         // Cyan #8BE9FD
+            [DiffTokenKind.Preprocessor] = Color.FromArgb(255, 255, 184, 108), // Orange #FFB86C
+            [DiffTokenKind.Attribute] = Color.FromArgb(255, 80, 250, 123),     // Green #50FA7B
+            [DiffTokenKind.Operator] = Color.FromArgb(255, 255, 121, 198),     // Pink #FF79C6
         }
     };
 }

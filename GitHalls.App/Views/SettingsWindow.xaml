@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:views="using:GitHalls.App.Views"
+    xmlns:controls="using:GitHalls.App.Controls"
     Title="GitHalls Settings">
 
     <Window.SystemBackdrop>
@@ -12,6 +13,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -19,87 +21,149 @@
             <TextBlock Text="Settings" VerticalAlignment="Center" Margin="16,0,0,0" FontSize="12" />
         </Grid>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
-            <StackPanel Spacing="12" Padding="16,4,16,16">
+        <!-- SelectorBar for Tabs -->
+        <SelectorBar x:Name="SettingsSelectorBar" Grid.Row="1"
+                     Margin="16,4,16,8"
+                     SelectionChanged="SettingsSelectorBar_SelectionChanged">
+            <SelectorBarItem x:Name="GitTabItem" Text="Git" />
+            <SelectorBarItem x:Name="JiraTabItem" Text="Jira" />
+            <SelectorBarItem x:Name="CustomizationTabItem" Text="Customização" />
+        </SelectorBar>
 
-                <!-- MARK: Jira -->
-                <StackPanel Style="{StaticResource GHCardPanelStyle}"
-                            Spacing="10" Padding="16,14">
-                    <TextBlock Text="Jira connection" Style="{StaticResource GHSectionHeaderTextStyle}" />
-                    <TextBlock x:Name="JiraStatusText" Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap" />
-
-                    <TextBox x:Name="SiteTextBox" Header="Site" PlaceholderText="https://your-domain.atlassian.net" />
-                    <TextBox x:Name="EmailTextBox" Header="Email" PlaceholderText="you@company.com" />
-
-                    <!-- Never echoed back: the token is written to the Windows
-                         Credential Manager and read from there, never shown. -->
-                    <PasswordBox x:Name="TokenPasswordBox" Header="API token" />
-                    <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
-                               Text="Create a token at id.atlassian.com under Security → API tokens. It is stored in the Windows Credential Manager, not in this app's settings file." />
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="ConnectButton" Content="Test and connect"
-                                Style="{StaticResource AccentButtonStyle}" Click="Connect_Click" />
-                        <Button x:Name="DisconnectButton" Content="Disconnect" Click="Disconnect_Click" />
-                        <ProgressRing x:Name="ConnectRing" Width="18" Height="18" IsActive="False"
-                                      Visibility="Collapsed" VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <InfoBar x:Name="JiraInfoBar" IsOpen="False" IsClosable="True" />
-                </StackPanel>
-
-                <!-- MARK: Identities -->
-                <StackPanel Style="{StaticResource GHCardPanelStyle}"
-                            Spacing="10" Padding="16,14">
-                    <TextBlock Text="Git identities" Style="{StaticResource GHSectionHeaderTextStyle}" />
-                    <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
-                               Text="Profiles you switch between from the toolbar. Applying one writes user.name and user.email into the open repository only, never your global config." />
-
-                    <ListView x:Name="IdentityList" MaxHeight="200"
-                              SelectionMode="Single"
-                              SelectionChanged="IdentityList_SelectionChanged"
-                              Style="{StaticResource GHListViewStyle}"
-                              ItemContainerStyle="{StaticResource GHCompactListItemStyle}">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="views:IdentityListRow">
-                                <StackPanel Padding="0,4" ToolTipService.ToolTip="{x:Bind ToolTip}">
-                                    <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" MaxLines="1" />
-                                    <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-
-                    <TextBlock x:Name="NoIdentitiesText" Style="{StaticResource GHCaptionTextStyle}"
-                               Text="No identities saved yet." Visibility="Collapsed" />
-
-                    <TextBox x:Name="LabelTextBox" Header="Label" PlaceholderText="Work" />
-                    <TextBox x:Name="NameTextBox" Header="Name" PlaceholderText="Jane Doe" />
-                    <TextBox x:Name="IdentityEmailTextBox" Header="Email" PlaceholderText="jane@company.com" />
-                    <TextBox x:Name="GitHubUserTextBox" Header="GitHub username (optional)" PlaceholderText="janedoe" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="SaveIdentityButton" Content="Save identity"
-                                Style="{StaticResource AccentButtonStyle}" Click="SaveIdentity_Click" />
-                        <Button x:Name="NewIdentityButton" Content="New" Click="NewIdentity_Click" />
-                        <Button x:Name="DeleteIdentityButton" Content="Delete" Click="DeleteIdentity_Click" />
-                    </StackPanel>
-
-                    <!-- Separate from the identity on purpose: this one is git's
-                         business, and the app keeps no copy of it. -->
-                    <StackPanel Spacing="8" Padding="12" CornerRadius="4"
-                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                        <TextBlock Text="GitHub token for this account" FontSize="12" FontWeight="SemiBold" />
+        <!-- Tab Content Area -->
+        <Grid Grid.Row="2">
+            <!-- TAB 1: Git -->
+            <ScrollViewer x:Name="GitPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" Visibility="Visible">
+                <StackPanel Spacing="12" Padding="16,4,16,16">
+                    <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                                Spacing="10" Padding="16,14">
+                        <TextBlock Text="Git identities" Style="{StaticResource GHSectionHeaderTextStyle}" />
                         <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
-                                   Text="Only needed when push or fetch fails with an authentication error. Handed to git's own credential helper for the GitHub username above; GitHalls does not keep a copy." />
-                        <PasswordBox x:Name="GitHubTokenPasswordBox" />
-                        <Button x:Name="SaveTokenButton" Content="Save token" HorizontalAlignment="Left"
-                                Click="SaveToken_Click" />
-                    </StackPanel>
+                                   Text="Profiles you switch between from the toolbar. Applying one writes user.name and user.email into the open repository only, never your global config." />
 
-                    <InfoBar x:Name="IdentityInfoBar" IsOpen="False" IsClosable="True" />
+                        <ListView x:Name="IdentityList" MaxHeight="200"
+                                  SelectionMode="Single"
+                                  SelectionChanged="IdentityList_SelectionChanged"
+                                  Style="{StaticResource GHListViewStyle}"
+                                  ItemContainerStyle="{StaticResource GHCompactListItemStyle}">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="views:IdentityListRow">
+                                    <StackPanel Padding="0,4" ToolTipService.ToolTip="{x:Bind ToolTip}">
+                                        <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                        <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <TextBlock x:Name="NoIdentitiesText" Style="{StaticResource GHCaptionTextStyle}"
+                                   Text="No identities saved yet." Visibility="Collapsed" />
+
+                        <TextBox x:Name="LabelTextBox" Header="Label" PlaceholderText="Work" />
+                        <TextBox x:Name="NameTextBox" Header="Name" PlaceholderText="Jane Doe" />
+                        <TextBox x:Name="IdentityEmailTextBox" Header="Email" PlaceholderText="jane@company.com" />
+                        <TextBox x:Name="GitHubUserTextBox" Header="GitHub username (optional)" PlaceholderText="janedoe" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="SaveIdentityButton" Content="Save identity"
+                                    Style="{StaticResource AccentButtonStyle}" Click="SaveIdentity_Click" />
+                            <Button x:Name="NewIdentityButton" Content="New" Click="NewIdentity_Click" />
+                            <Button x:Name="DeleteIdentityButton" Content="Delete" Click="DeleteIdentity_Click" />
+                        </StackPanel>
+
+                        <!-- Separate from the identity on purpose: this one is git's
+                             business, and the app keeps no copy of it. -->
+                        <StackPanel Spacing="8" Padding="12" CornerRadius="4"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <TextBlock Text="GitHub token for this account" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
+                                       Text="Only needed when push or fetch fails with an authentication error. Handed to git's own credential helper for the GitHub username above; GitHalls does not keep a copy." />
+                            <PasswordBox x:Name="GitHubTokenPasswordBox" />
+                            <Button x:Name="SaveTokenButton" Content="Save token" HorizontalAlignment="Left"
+                                    Click="SaveToken_Click" />
+                        </StackPanel>
+
+                        <InfoBar x:Name="IdentityInfoBar" IsOpen="False" IsClosable="True" />
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+
+            <!-- TAB 2: Jira -->
+            <ScrollViewer x:Name="JiraPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" Visibility="Collapsed">
+                <StackPanel Spacing="12" Padding="16,4,16,16">
+                    <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                                Spacing="10" Padding="16,14">
+                        <TextBlock Text="Jira connection" Style="{StaticResource GHSectionHeaderTextStyle}" />
+                        <TextBlock x:Name="JiraStatusText" Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap" />
+
+                        <TextBox x:Name="SiteTextBox" Header="Site" PlaceholderText="https://your-domain.atlassian.net" />
+                        <TextBox x:Name="EmailTextBox" Header="Email" PlaceholderText="you@company.com" />
+
+                        <!-- Never echoed back: the token is written to the Windows
+                             Credential Manager and read from there, never shown. -->
+                        <PasswordBox x:Name="TokenPasswordBox" Header="API token" />
+                        <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
+                                   Text="Create a token at id.atlassian.com under Security → API tokens. It is stored in the Windows Credential Manager, not in this app's settings file." />
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ConnectButton" Content="Test and connect"
+                                    Style="{StaticResource AccentButtonStyle}" Click="Connect_Click" />
+                            <Button x:Name="DisconnectButton" Content="Disconnect" Click="Disconnect_Click" />
+                            <ProgressRing x:Name="ConnectRing" Width="18" Height="18" IsActive="False"
+                                          Visibility="Collapsed" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <InfoBar x:Name="JiraInfoBar" IsOpen="False" IsClosable="True" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- TAB 3: Customização -->
+            <ScrollViewer x:Name="CustomizationPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" Visibility="Collapsed">
+                <StackPanel Spacing="12" Padding="16,4,16,16">
+                    <StackPanel Style="{StaticResource GHCardPanelStyle}"
+                                Spacing="14" Padding="16,14">
+                        <TextBlock Text="Tema e Fonte do Diff" Style="{StaticResource GHSectionHeaderTextStyle}" />
+                        <TextBlock Style="{StaticResource GHCaptionTextStyle}" TextWrapping="Wrap"
+                                   Text="Personalize a paleta de cores, a família de fontes e o tamanho do texto para o visualizador de código e diffs do GitHalls." />
+
+                        <!-- Theme Selector -->
+                        <ComboBox x:Name="ThemeComboBox" Header="Tema de cores" HorizontalAlignment="Stretch"
+                                  SelectionChanged="ThemeComboBox_SelectionChanged" />
+
+                        <!-- Font Family Selector -->
+                        <ComboBox x:Name="FontFamilyComboBox" Header="Fonte do código" HorizontalAlignment="Stretch"
+                                  IsEditable="True"
+                                  SelectionChanged="FontFamilyComboBox_SelectionChanged"
+                                  TextSubmitted="FontFamilyComboBox_TextSubmitted" />
+
+                        <!-- Font Size Selector -->
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="FontSizeSlider" Header="Tamanho da fonte"
+                                    Minimum="10" Maximum="24" StepFrequency="1" TickFrequency="1"
+                                    ValueChanged="FontSizeSlider_ValueChanged" />
+                            <NumberBox x:Name="FontSizeNumberBox" Grid.Column="1"
+                                       Header=" " Width="80"
+                                       Minimum="10" Maximum="24" SmallChange="1"
+                                       SpinButtonPlacementMode="Inline"
+                                       ValueChanged="FontSizeNumberBox_ValueChanged" />
+                        </Grid>
+
+                        <!-- Live Preview Section -->
+                        <StackPanel Spacing="6" Margin="0,4,0,0">
+                            <TextBlock Text="Pré-visualização ao vivo" FontSize="12" FontWeight="SemiBold" />
+                            <Border BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    CornerRadius="6" Height="220">
+                                <controls:DiffTextView x:Name="PreviewDiffView" />
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </Window>

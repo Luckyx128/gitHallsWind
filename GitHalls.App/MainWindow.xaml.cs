@@ -223,7 +223,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var window = new SettingsWindow(_jiraAccount, ViewModel);
+        var window = new SettingsWindow(_jiraAccount, ViewModel, _settingsStore);
         _settingsWindow = window;
 
         window.AccountChanged += (_, _) =>

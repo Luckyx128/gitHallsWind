@@ -211,6 +211,7 @@ public sealed partial class DiffTextView : UserControl
 
         ActualThemeChanged += (_, _) => ApplyTheme();
         Loaded += (_, _) => ApplyTheme();
+        DiffTextTheme.ThemeChanged += (_, _) => ApplyTheme();
 
         var findAccelerator = new KeyboardAccelerator { Key = VirtualKey.F, Modifiers = VirtualKeyModifiers.Control };
         findAccelerator.Invoked += (_, args) => { args.Handled = true; OpenFind(); };
@@ -879,6 +880,12 @@ public sealed partial class DiffTextView : UserControl
         TextLayer.FontFamily = new FontFamily(DiffTextTheme.FontFamily);
         TextLayer.FontSize = DiffTextTheme.FontSize;
         TextLayer.LineHeight = DiffTextTheme.LineHeight;
+
+        if (_diff != null)
+        {
+            MeasureGutter();
+            BuildText();
+        }
 
         UpdateContentSize();
         RepaintLayers(force: true);

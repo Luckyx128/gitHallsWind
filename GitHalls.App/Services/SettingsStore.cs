@@ -40,6 +40,15 @@ public class AppSettings
 
     /// <summary>Commit hashes that have had post-push comments added to Jira, keyed by Jira issue key.</summary>
     public Dictionary<string, List<string>> PostedPushComments { get; set; } = new();
+
+    /// <summary>Diff text view theme name: "Padrão do Sistema", "Catppuccin Mocha", "Catppuccin Latte", "Dracula".</summary>
+    public string DiffThemeName { get; set; } = "Padrão do Sistema";
+
+    /// <summary>Font family used in DiffTextView.</summary>
+    public string DiffFontFamily { get; set; } = "Cascadia Mono, Consolas, Courier New";
+
+    /// <summary>Font size used in DiffTextView.</summary>
+    public double DiffFontSize { get; set; } = 13;
 }
 
 /// <summary>
@@ -77,7 +86,21 @@ public class SettingsStore
     public async Task<AppSettings> LoadAsync()
     {
         Current = await ReadAsync();
+        ApplyDiffPreferences(Current);
         return Current;
+    }
+
+    public static void ApplyDiffPreferences(AppSettings settings)
+    {
+        var font = string.IsNullOrWhiteSpace(settings.DiffFontFamily)
+            ? "Cascadia Mono, Consolas, Courier New"
+            : settings.DiffFontFamily;
+        var size = settings.DiffFontSize > 0 ? settings.DiffFontSize : 13;
+        var gutterSize = Math.Max(10, size - 1);
+        var lineHeight = Math.Round(size * 1.46);
+
+        Themes.DiffTextTheme.UpdateMetrics(font, size, gutterSize, lineHeight);
+        Themes.DiffTextTheme.SetActiveTheme(settings.DiffThemeName);
     }
 
     private async Task<AppSettings> ReadAsync()
