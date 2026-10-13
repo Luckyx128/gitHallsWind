@@ -97,7 +97,7 @@
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{x:Bind Commit.AuthorName}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
+                                <TextBlock Text="{x:Bind Commit.AuthorsDisplay}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
                                 <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                 <TextBlock Text="{x:Bind Commit.RelativeDate}" Style="{StaticResource GHCaptionTextStyle}" />
                                 <TextBlock Text="{x:Bind Commit.ShortHash}" FontSize="11" FontFamily="Cascadia Mono, Cascadia Code, Consolas"

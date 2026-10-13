@@ -57,4 +57,46 @@ public class Commit
             return Date.ToLocalTime().ToString("d MMM yyyy");
         }
     }
+
+    /// <summary>
+    /// Co-authors extracted from "Co-authored-by: Name <email>" trailers in the commit message.
+    /// </summary>
+    public IReadOnlyList<string> CoAuthors
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Message)) return Array.Empty<string>();
+            var list = new List<string>();
+            foreach (var line in Message.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("Co-authored-by:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var val = trimmed.Substring("Co-authored-by:".Length).Trim();
+                    if (!string.IsNullOrEmpty(val))
+                    {
+                        list.Add(val);
+                    }
+                }
+            }
+            return list;
+        }
+    }
+
+    /// <summary>
+    /// Displays Author Name and co-authors if present (e.g., "Lucas (+Helix, Prism)").
+    /// </summary>
+    public string AuthorsDisplay
+    {
+        get
+        {
+            if (CoAuthors.Count == 0) return AuthorName;
+            var names = CoAuthors.Select(a =>
+            {
+                var idx = a.IndexOf('<');
+                return idx > 0 ? a.Substring(0, idx).Trim() : a.Trim();
+            });
+            return $"{AuthorName} (+{string.Join(", ", names)})";
+        }
+    }
 }

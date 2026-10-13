@@ -98,4 +98,16 @@ public class CommitMessageFormatterTests
         var expected = "feat: add new feature\n\nCo-authored-by: Alice <alice@test.com>";
         Assert.Equal(expected, CommitMessageFormatter.InjectCoAuthors(message, new[] { "Co-authored-by: Alice <alice@test.com>" }));
     }
+
+    [Fact]
+    public void Commit_ExtractsCoAuthors_AndFormatsAuthorsDisplay()
+    {
+        var msg = "feat: great feature\n\nSome body\n\nCo-authored-by: Alice Smith <alice@example.com>\nCo-authored-by: Bob <bob@example.com>";
+        var commit = new GitHalls.Core.Models.Commit("abc1234", "Lucas", "lucas@test.com", DateTimeOffset.UtcNow, msg);
+
+        Assert.Equal(2, commit.CoAuthors.Count);
+        Assert.Equal("Alice Smith <alice@example.com>", commit.CoAuthors[0]);
+        Assert.Equal("Bob <bob@example.com>", commit.CoAuthors[1]);
+        Assert.Equal("Lucas (+Alice Smith, Bob)", commit.AuthorsDisplay);
+    }
 }

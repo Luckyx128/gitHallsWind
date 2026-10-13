@@ -69,7 +69,7 @@ public sealed partial class CommitDetailPage : Page
         DetailRoot.Visibility = Visibility.Visible;
 
         SummaryText.Text = commit.Summary;
-        AuthorText.Text = commit.AuthorName;
+        AuthorText.Text = commit.AuthorsDisplay;
         DateText.Text = commit.Date.ToLocalTime().ToString("d MMM yyyy, HH:mm");
         HashText.Text = commit.ShortHash;
 
