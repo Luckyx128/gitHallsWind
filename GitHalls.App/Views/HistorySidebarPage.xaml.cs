@@ -84,6 +84,7 @@ public sealed partial class HistorySidebarPage : Page
 
     public Visibility ToVisibility(bool isVisible) => isVisible ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ToErrorVisibility(string? errorMessage) => string.IsNullOrEmpty(errorMessage) ? Visibility.Collapsed : Visibility.Visible;
+    public bool IsErrorOpen(string? errorMessage) => !string.IsNullOrEmpty(errorMessage);
 
     private void Checkout_Click(object sender, RoutedEventArgs e)
     {
@@ -108,7 +109,7 @@ public sealed partial class HistorySidebarPage : Page
             var textBox = new TextBox { PlaceholderText = "Branch name", Width = 300 };
             var dialog = new ContentDialog
             {
-                Title = "Create Branch",
+                Title = "Create branch",
                 Content = textBox,
                 PrimaryButtonText = "Create",
                 CloseButtonText = "Cancel",
@@ -138,7 +139,7 @@ public sealed partial class HistorySidebarPage : Page
                 var comboBox = new ComboBox { ItemsSource = localBranches, SelectedIndex = 0, Width = 300 };
                 var dialog = new ContentDialog
                 {
-                    Title = "Delete Branch",
+                    Title = "Delete branch",
                     Content = comboBox,
                     PrimaryButtonText = "Delete",
                     CloseButtonText = "Cancel",
@@ -172,7 +173,7 @@ public sealed partial class HistorySidebarPage : Page
             var textBox = new TextBox { Text = oldName, Width = 300 };
             var dialog = new ContentDialog
             {
-                Title = "Rename Branch",
+                Title = "Rename branch",
                 Content = textBox,
                 PrimaryButtonText = "Rename",
                 CloseButtonText = "Cancel",
@@ -195,7 +196,7 @@ public sealed partial class HistorySidebarPage : Page
             var branchName = remoteBranches[0].Substring("origin/".Length);
             var dialog = new ContentDialog
             {
-                Title = "Delete Remote Branch",
+                Title = "Delete remote branch",
                 Content = $"Are you sure you want to delete the remote branch '{branchName}'?",
                 PrimaryButtonText = "Delete",
                 CloseButtonText = "Cancel",

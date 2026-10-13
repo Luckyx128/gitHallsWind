@@ -16,6 +16,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -26,18 +27,20 @@
             <SelectorBarItem x:Name="CurrentBranchItem" Text="Current branch" />
         </SelectorBar>
 
-        <ProgressRing Grid.Row="1"
+        <InfoBar Grid.Row="1"
+                 Severity="Error"
+                 IsOpen="{x:Bind IsErrorOpen(ViewModel.GitgraphViewModel.ErrorMessage), Mode=OneWay}"
+                 Visibility="{x:Bind ToErrorVisibility(ViewModel.GitgraphViewModel.ErrorMessage), Mode=OneWay}"
+                 Message="{x:Bind ViewModel.GitgraphViewModel.ErrorMessage, Mode=OneWay}"
+                 IsClosable="False"
+                 Margin="12,0,12,6" />
+
+        <ProgressRing Grid.Row="2"
                       IsActive="{x:Bind ViewModel.GitgraphViewModel.IsLoading, Mode=OneWay}"
                       Visibility="{x:Bind ToVisibility(ViewModel.GitgraphViewModel.IsLoading), Mode=OneWay}"
                       HorizontalAlignment="Center" VerticalAlignment="Center" />
 
-        <TextBlock Grid.Row="1"
-                   Text="{x:Bind ViewModel.GitgraphViewModel.ErrorMessage, Mode=OneWay}"
-                   Foreground="Red"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   Visibility="{x:Bind ToErrorVisibility(ViewModel.GitgraphViewModel.ErrorMessage), Mode=OneWay}" />
-
-        <ListView x:Name="HistoryList" Grid.Row="1"
+        <ListView x:Name="HistoryList" Grid.Row="2"
                   ItemsSource="{x:Bind ViewModel.GitgraphViewModel.Rows, Mode=OneWay}"
                   SelectedItem="{x:Bind ViewModel.GitgraphViewModel.SelectedRow, Mode=TwoWay}"
                   SelectionMode="Single"
@@ -100,7 +103,7 @@
                                 <TextBlock Text="{x:Bind Commit.AuthorsDisplay}" Style="{StaticResource GHCaptionTextStyle}" MaxLines="1" />
                                 <TextBlock Text="·" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                 <TextBlock Text="{x:Bind Commit.RelativeDate}" Style="{StaticResource GHCaptionTextStyle}" />
-                                <TextBlock Text="{x:Bind Commit.ShortHash}" FontSize="11" FontFamily="Cascadia Mono, Cascadia Code, Consolas"
+                                <TextBlock Text="{x:Bind Commit.ShortHash}" FontSize="11" FontFamily="{StaticResource GHMonospaceFontFamily}"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                             </StackPanel>
                         </StackPanel>

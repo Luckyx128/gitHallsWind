@@ -12,6 +12,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:FileStatusToBrushConverter x:Key="StatusBrush" />
         <converters:FileStatusToBrushConverter x:Key="StatusTint" Tint="True" />
+        <converters:FileStatusToStringConverter x:Key="StatusText" />
         <CollectionViewSource x:Name="GroupedChangesSource" IsSourceGrouped="True" Source="{x:Bind ViewModel.GroupedChanges, Mode=OneWay}" />
     </Page.Resources>
 
@@ -33,7 +34,7 @@
 
             <!-- Three-state: checked = all staged, indeterminate = some, unchecked = none. -->
             <CheckBox x:Name="StageAllCheckBox" Grid.Column="0"
-                      Content="Stage All Changes"
+                      Content="Stage all changes"
                       IsThreeState="True"
                       IsChecked="{x:Bind ViewModel.StagedState, Mode=OneWay}"
                       Click="StageAllCheckBox_Click"
@@ -56,7 +57,7 @@
                  Title="{x:Bind ViewModel.MergeOrConflictTitle, Mode=OneWay}"
                  Message="{x:Bind ViewModel.MergeOrConflictMessage, Mode=OneWay}">
             <InfoBar.ActionButton>
-                <Button Content="Cancel Merge" Command="{x:Bind ViewModel.AbortMergeCommand}" Visibility="{x:Bind ViewModel.AbortMergeVisibility, Mode=OneWay}" />
+                <Button Content="Cancel merge" Command="{x:Bind ViewModel.AbortMergeCommand}" Visibility="{x:Bind ViewModel.AbortMergeVisibility, Mode=OneWay}" />
             </InfoBar.ActionButton>
         </InfoBar>
 
@@ -77,10 +78,10 @@
             <ListView.ContextFlyout>
                 <MenuFlyout Opening="ChangesContextFlyout_Opening">
                     <!-- Resolving is what a conflicted file needs first, so it leads. -->
-                    <MenuFlyoutItem x:Name="ResolveMenuItem" Text="Mark as Resolved"
+                    <MenuFlyoutItem x:Name="ResolveMenuItem" Text="Mark as resolved"
                                     Visibility="Collapsed" Click="ResolveMenuItem_Click" />
                     <MenuFlyoutSubItem x:Name="OpenInMenuItem" Text="Open in" />
-                    <MenuFlyoutItem x:Name="DiscardMenuItem" Text="Discard Changes..." Click="DiscardMenuItem_Click" />
+                    <MenuFlyoutItem x:Name="DiscardMenuItem" Text="Discard changes..." Click="DiscardMenuItem_Click" />
                 </MenuFlyout>
             </ListView.ContextFlyout>
             <ListView.ItemTemplate>
@@ -103,9 +104,12 @@
                         </StackPanel>
 
                         <Border Grid.Column="2" Style="{StaticResource GHStatusBadgeStyle}"
-                                Background="{x:Bind BadgeStatus, Converter={StaticResource StatusTint}}">
+                                Background="{x:Bind BadgeStatus, Converter={StaticResource StatusTint}}"
+                                ToolTipService.ToolTip="{x:Bind BadgeStatus, Converter={StaticResource StatusText}}"
+                                AutomationProperties.Name="{x:Bind BadgeStatus, Converter={StaticResource StatusText}}">
                             <TextBlock Text="{x:Bind BadgeLetter}" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{x:Bind BadgeStatus, Converter={StaticResource StatusBrush}}" />
+                                       Foreground="{x:Bind BadgeStatus, Converter={StaticResource StatusBrush}}"
+                                       AutomationProperties.Name="{x:Bind BadgeStatus, Converter={StaticResource StatusText}}" />
                         </Border>
                     </Grid>
                 </DataTemplate>

@@ -308,7 +308,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     /// <summary>Label of the single sync button. Port of SyncButton.swift.</summary>
     public string SyncTitle => CurrentSyncAction switch
     {
-        SyncAction.Publish => "Publish Branch",
+        SyncAction.Publish => "Publish branch",
         SyncAction.Push => $"Push ({SyncAhead})",
         SyncAction.Pull => $"Pull ({SyncBehind})",
         SyncAction.PullThenPush => $"Sync (\u2193{SyncBehind} \u2191{SyncAhead})",
@@ -1766,7 +1766,7 @@ public partial class RepositoryViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(CommitButtonText), nameof(ShowMergeOrConflictBar), nameof(MergeOrConflictTitle), nameof(MergeOrConflictMessage), nameof(MergeOrConflictSeverity), nameof(ShowAbortMergeButton), nameof(AbortMergeVisibility))]
     private bool _isMerging;
 
-    public string CommitButtonText => IsMerging ? "Commit Merge" : IsAmending ? "Amend Commit" : "Commit";
+    public string CommitButtonText => IsMerging ? "Commit merge" : IsAmending ? "Amend commit" : "Commit";
 
     public bool ShowMergeOrConflictBar => IsMerging || HasConflicts;
 

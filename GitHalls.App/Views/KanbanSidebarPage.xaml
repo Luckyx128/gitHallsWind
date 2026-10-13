@@ -60,7 +60,7 @@
             <TextBlock Text="No Jira account connected yet."
                        HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            <Button Content="Open Settings" HorizontalAlignment="Center" Click="Connect_Click" />
+            <Button Content="Open settings" HorizontalAlignment="Center" Click="Connect_Click" />
         </StackPanel>
 
         <Button x:Name="AddQueryButton" Grid.Row="1" Margin="12,0,12,12" HorizontalAlignment="Stretch"

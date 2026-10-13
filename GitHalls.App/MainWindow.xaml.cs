@@ -300,7 +300,7 @@ public sealed partial class MainWindow : Window
         var selectedFolderText = new TextBlock
         {
             Margin = new Thickness(0, 8, 0, 0),
-            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
         };
         string? destinationPath = null;
 
@@ -631,7 +631,7 @@ public sealed partial class MainWindow : Window
             var name = hasRepo ? FolderName(ViewModel.RepositoryPath!) : null;
 
             TitleBarText.Text = name == null ? "GitHalls" : $"GitHalls • {name}";
-            RepositoryButtonText.Text = name ?? "Open Repository";
+            RepositoryButtonText.Text = name ?? "Open repository";
             ToolTipService.SetToolTip(RepositoryButton, ViewModel.RepositoryPath ?? "No repository open");
 
             // Every issue window names the repository a branch would be created in.
