@@ -3,7 +3,8 @@
     x:Class="GitHalls.App.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:GitHalls.App">
+    xmlns:local="using:GitHalls.App"
+    xmlns:converters="using:GitHalls.App.Converters">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -11,6 +12,7 @@
                 <ResourceDictionary Source="ms-appx:///Styles/AppStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <!-- Other app resources here -->
+            <converters:TimeSpanToStringConverter x:Key="TimeSpanToStringConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
